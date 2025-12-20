@@ -116,6 +116,22 @@ const getInitialData = () => {
   };
 };
 
+// Safe storage adapter that handles SSR
+const createSafeStorage = (): Storage => {
+  if (typeof window === 'undefined') {
+    // Return a no-op storage for SSR that implements the Storage interface
+    return {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+      get length() { return 0; },
+      key: () => null,
+    } as Storage;
+  }
+  return localStorage;
+};
+
 // Check if we need to clear localStorage due to environment change
 const checkEnvironmentChange = () => {
   if (typeof window === 'undefined') return;
@@ -152,8 +168,10 @@ const checkEnvironmentChange = () => {
 export const useWalletStore = create<WalletState>()(
   persist(
     (set, get) => {
-      // Check for environment changes and clear storage if needed
-      checkEnvironmentChange();
+      // Check for environment changes and clear storage if needed (only on client)
+      if (typeof window !== 'undefined') {
+        checkEnvironmentChange();
+      }
 
       const initialData = getInitialData();
       return {
@@ -855,6 +873,7 @@ export const useWalletStore = create<WalletState>()(
     {
       name: 'lazorkit-wallet-storage',
       version: 1,
+      storage: createSafeStorage(),
       migrate: (persistedState: unknown, version: number) => {
         // If migrating from version 0 (no version) or if demo mode is disabled,
         // reset the wallet state to match the environment configuration
