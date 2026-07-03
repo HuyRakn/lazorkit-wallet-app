@@ -25,7 +25,7 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
 
   // SWR for DB posts fetching (paginated / auto-refresh every 8s)
   const { data: feedData, mutate, isLoading, error } = useSWR(
-    `${apiBase}/api/posts?limit=15`,
+    `${apiBase}/api/posts?limit=30`,
     fetcher,
     { refreshInterval: 8000 }
   );
@@ -168,7 +168,7 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       {/* Avatar */}
-                      <div className="w-8.5 h-8.5 rounded-full bg-gradient-to-br from-primary/20 via-purple-500/10 to-emerald-500/15 flex items-center justify-center border border-border/40 font-mono text-[9px] font-black uppercase text-foreground">
+                      <div className="w-8.5 h-8.5 rounded-full bg-gradient-to-br from-primary/20 via-accent/10 to-emerald-500/15 flex items-center justify-center border border-border/40 font-mono text-[9px] font-black uppercase text-foreground">
                         {post.walletAddress.slice(0, 2)}
                       </div>
                       <div className="flex flex-col">

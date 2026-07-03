@@ -106,9 +106,9 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
   };
 
   return (
-    <div className="group glass-card rounded-2xl border border-border/60 hover:border-purple-500/20 p-5 space-y-4 transition-all duration-300 relative overflow-hidden select-none hover:shadow-lg hover:shadow-purple-500/5">
+    <div className="group glass-card rounded-2xl border border-border/60 hover:border-primary/20 p-5 space-y-4 transition-all duration-300 relative overflow-hidden select-none hover:shadow-lg hover:shadow-primary/5">
       {/* Top ambient colored light indicator */}
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-purple-500/30 via-primary/20 to-transparent" />
+      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-accent/30 via-primary/20 to-transparent" />
 
       {/* Header Info */}
       <div className="flex justify-between items-center">
@@ -129,7 +129,7 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground/80 font-medium">{formatTime(post.createdAt)}</span>
-          <div className="w-6 h-6 rounded-md bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+          <div className="w-6 h-6 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
             <Sparkles className="h-3 w-3" />
           </div>
         </div>

@@ -26,17 +26,18 @@ export function BottomNav({ activeSection, onSectionChange }: BottomNavProps) {
   return (
     <div className="md:hidden fixed bottom-6 left-4 right-4 z-45">
       {/* Floating Glassmorphic Neo-Dock */}
-      <div className="flex items-center justify-between h-16 px-4 rounded-full bg-[#08090d]/80 backdrop-blur-2xl border border-white/[0.08] shadow-[0_20px_50px_rgba(0,0,0,0.85)]">
+      <div className="flex items-center justify-between h-16 px-4 rounded-full bg-background/80 backdrop-blur-2xl border border-border/40 shadow-[0_20px_50px_rgba(0,0,0,0.65)]">
         <AnimatePresence initial={false}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSection === tab.id;
 
             return (
-              <button
+              <motion.button
                 key={tab.id}
                 onClick={() => onSectionChange(tab.id)}
-                className="relative flex items-center justify-center select-none transition-all duration-200 outline-none"
+                whileTap={{ scale: 0.95 }}
+                className="relative flex items-center justify-center select-none transition-all duration-200 outline-none cursor-pointer"
               >
                 <motion.div
                   layout
@@ -48,7 +49,7 @@ export function BottomNav({ activeSection, onSectionChange }: BottomNavProps) {
                   }}
                   className={`flex items-center gap-2 px-3.5 py-2.5 rounded-full ${
                     isActive 
-                      ? 'bg-gradient-to-r from-primary/20 to-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(22,255,187,0.12)]' 
+                      ? 'bg-gradient-to-r from-primary/15 to-accent/5 text-primary border border-primary/30 shadow-[0_0_20px_rgba(22,255,187,0.15)]' 
                       : 'text-muted-foreground/80 hover:text-foreground'
                   }`}
                 >
@@ -66,7 +67,7 @@ export function BottomNav({ activeSection, onSectionChange }: BottomNavProps) {
                     </motion.span>
                   )}
                 </motion.div>
-              </button>
+              </motion.button>
             );
           })}
         </AnimatePresence>

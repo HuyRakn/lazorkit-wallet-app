@@ -1,6 +1,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
-import { JupiterToken, fetchTokenData, getTokenBalance, defaultConnection, TOKEN_ADDRESSES } from './jupiter';
-import { TokenHolding } from '@/lib/mock-data/types';
+import { JupiterToken, fetchTokenData, getAllTokenBalances, defaultConnection, TOKEN_ADDRESSES } from './jupiter';
+import { TokenHolding } from '@/lib/types';
+
 
 export interface RealTokenData {
   symbol: string;
@@ -34,10 +35,13 @@ export async function fetchRealTokenData(
 
     const tokens: TokenHolding[] = [];
     
+    // Fetch all balances at once using a batch (only 2 RPC calls: SOL + SPL Token accounts)
+    const allBalances = await getAllTokenBalances(walletAddress, connection);
+    
     // Fetch data for all supported tokens with rate limiting
     const tokenSymbols = Object.keys(TOKEN_ADDRESSES) as Array<keyof typeof TOKEN_ADDRESSES>;
     
-    // Process tokens in batches to avoid rate limiting
+    // Process tokens in batches to avoid rate limiting on Jupiter API
     const batchSize = 3;
     for (let i = 0; i < tokenSymbols.length; i += batchSize) {
       const batch = tokenSymbols.slice(i, i + batchSize);
@@ -52,8 +56,8 @@ export async function fetchRealTokenData(
           // Small delay between requests
           await new Promise(resolve => setTimeout(resolve, 200));
           
-          // Get real balance from blockchain
-          const balance = await getTokenBalance(walletAddress, mint, connection);
+          // Get real balance from the batch loaded balances
+          const balance = allBalances.get(mint) || 0;
           
           // Get price from Jupiter or fallback
           const priceUsd = jupiterData?.usdPrice || getDefaultPrice(symbol);
@@ -110,38 +114,14 @@ export async function fetchRealTokenData(
   }
 }
 
-// Default prices for fallback (updated regularly)
+// Default prices for fallback (return 0 to maintain on-chain integrity)
 function getDefaultPrice(symbol: string): number {
-  const defaultPrices: Record<string, number> = {
-    'SOL': 95.5,
-    'USDC': 1.0,
-    'USDT': 1.0,
-    'BONK': 0.000012,
-    'RAY': 2.45,
-    'JUP': 0.85,
-    'ORCA': 3.2,
-    'mSOL': 96.8,
-    'JitoSOL': 97.2,
-    'PYTH': 0.45,
-  };
-  return defaultPrices[symbol] || 0;
+  return 0;
 }
 
 // Default 24h changes for fallback
 function getDefaultChange(symbol: string): number {
-  const defaultChanges: Record<string, number> = {
-    'SOL': 2.3,
-    'USDC': 0.1,
-    'USDT': -0.1,
-    'BONK': 5.2,
-    'RAY': 1.8,
-    'JUP': -2.1,
-    'ORCA': 0.5,
-    'mSOL': 2.1,
-    'JitoSOL': 2.5,
-    'PYTH': -1.2,
-  };
-  return defaultChanges[symbol] || 0;
+  return 0;
 }
 
 // Clear cache function

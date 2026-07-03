@@ -31,7 +31,7 @@ export function NewsCard({ article }: NewsCardProps) {
   return (
     <div className="group glass-card rounded-2xl border border-border/60 hover:border-primary/30 p-5 space-y-4 transition-all duration-300 relative overflow-hidden select-none hover:shadow-lg hover:shadow-primary/5">
       {/* Top subtle neon line */}
-      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary/30 via-purple-500/20 to-transparent" />
+      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-primary/30 via-accent/20 to-transparent" />
 
       {/* Header metadata */}
       <div className="flex justify-between items-center">

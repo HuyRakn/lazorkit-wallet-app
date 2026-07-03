@@ -25,7 +25,7 @@ import { LandingPage } from '@/components/landing-page';
 import { fetchCommonTokens, JupiterToken, defaultConnection } from '@/lib/services/jupiter';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/loading-skeleton';
-import { Sparkles, MessageSquare, Newspaper, Star } from 'lucide-react';
+import { Sparkles, MessageSquare, Newspaper, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function HomePage() {
@@ -36,6 +36,7 @@ export default function HomePage() {
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const mainContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Scroll to top on active section change
@@ -87,23 +88,36 @@ export default function HomePage() {
           {/* Mobile Balance Card Overview */}
           {pubkey && (
             <div className="md:hidden max-w-md mx-auto w-full">
-              <WalletCardMini 
-                onSendClick={() => setSendModalOpen(true)} 
-                onDepositClick={() => setDepositModalOpen(true)} 
+              <WalletCardMini
+                onSendClick={() => setSendModalOpen(true)}
+                onDepositClick={() => setDepositModalOpen(true)}
               />
             </div>
           )}
 
-          {/* Main Crypto-Social Feed */}
-          <div className="space-y-3">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Activity Feed</span>
-            <CryptoFeed onTradeClick={() => setActiveSection('buy')} />
-          </div>
+          {/* Desktop Multi-Column Dashboard (Split layout with sticky right column) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Ecosystem Feed (scrolls naturally like Instagram/Facebook) */}
+            <div className="md:col-span-7 order-2 md:order-1 space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider block">Ecosystem Feed</span>
+                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-extrabold uppercase tracking-wider">Live Activity</span>
+                </div>
+                <CryptoFeed onTradeClick={() => setActiveSection('buy')} />
+              </div>
+            </div>
 
-          {/* Current Assets Tab */}
-          <div className="space-y-3">
-            <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Your Assets</span>
-            <AssetsTab />
+            {/* Right Column: Sticky Portfolio Assets (Always fits without scroll) */}
+            <div className="md:col-span-5 order-1 md:order-2 space-y-6 md:sticky md:top-6 h-fit pb-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider block">Your Assets</span>
+                  <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-extrabold uppercase tracking-wider">Devnet Sync</span>
+                </div>
+                <AssetsTab onDepositClick={() => setDepositModalOpen(true)} />
+              </div>
+            </div>
           </div>
         </div>
       );
@@ -112,7 +126,7 @@ export default function HomePage() {
     // 2. If trying to access other tabs without a connected wallet, show AuthRequiredView
     if (!hasWallet) {
       return (
-        <AuthRequiredView 
+        <AuthRequiredView
           onConnectClick={() => setConnectModalOpen(true)}
           title={`${activeSection.toUpperCase()} Studio Security`}
           description={`Please connect your biometric passkey wallet to access the ${activeSection} interface.`}
@@ -166,7 +180,7 @@ export default function HomePage() {
               <p className="text-sm text-muted-foreground">Transfer assets safely on Solana or display your QR code to receive.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
-              <Card 
+              <Card
                 onClick={() => setSendModalOpen(true)}
                 className="p-6 bg-card border-border hover:border-primary/40 cursor-pointer transition text-center space-y-3 hover-lift"
               >
@@ -176,7 +190,7 @@ export default function HomePage() {
                 <h3 className="text-sm font-bold text-foreground">Send Tokens</h3>
                 <p className="text-xs text-muted-foreground">Send tokens gas-free using a Solana address or username.</p>
               </Card>
-              <Card 
+              <Card
                 onClick={() => setDepositModalOpen(true)}
                 className="p-6 bg-card border-border hover:border-primary/40 cursor-pointer transition text-center space-y-3 hover-lift"
               >
@@ -228,38 +242,65 @@ export default function HomePage() {
 
   // 5. Render Workspace Layout if wallet is connected (Private Portal View)
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen flex flex-col relative z-10 overflow-hidden">
       {/* Mobile Top Header */}
       <div className="md:hidden">
         <AppHeader showMenu={false} />
       </div>
 
       {/* Main Layout Container */}
-      <div className="flex-1 flex w-full max-w-none px-0 mx-0 relative">
+      <div className="flex-1 flex w-full max-w-none px-0 mx-0 relative overflow-hidden">
         {/* Left Sidebar - Desktop (Cột 1) */}
-        <aside className="hidden md:block w-[280px] lg:w-[320px] shrink-0 sticky top-0 h-screen overflow-y-auto border-r border-border bg-card/10 backdrop-blur-md">
-          <SidebarNav
-            activeSection={activeSection}
-            onSectionChange={setActiveSection}
-            onSendClick={() => setSendModalOpen(true)}
-            onDepositClick={() => setDepositModalOpen(true)}
-            onConnectClick={() => setConnectModalOpen(true)}
-          />
-        </aside>
+        <div className="relative hidden md:block shrink-0 z-30">
+          <motion.aside
+            animate={{ width: sidebarCollapsed ? 80 : 240 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+            className="h-screen overflow-y-auto bg-card/15 backdrop-blur-2xl border-r border-white/[0.06] overflow-x-hidden"
+          >
+            <SidebarNav
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              onSendClick={() => setSendModalOpen(true)}
+              onDepositClick={() => setDepositModalOpen(true)}
+              onConnectClick={() => setConnectModalOpen(true)}
+              collapsed={sidebarCollapsed}
+            />
+          </motion.aside>
+
+          {/* Absolutely Centered Floating Toggle Button */}
+          <motion.button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            whileHover={{ scale: 1.1, borderColor: 'var(--primary)' }}
+            whileTap={{ scale: 0.95 }}
+            className="absolute top-1/2 -right-3 -translate-y-1/2 z-50 w-6 h-6 rounded-full bg-[#0d0e12] border border-white/[0.08] text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer shadow-[0_0_15px_rgba(0,0,0,0.8)]"
+            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            <motion.div
+              animate={{ rotate: sidebarCollapsed ? 180 : 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+              className="flex items-center justify-center"
+            >
+              <ChevronLeft className="h-3.5 w-3.5 text-primary" />
+            </motion.div>
+          </motion.button>
+        </div>
 
         {/* Center Main Scroll View (Cột 2) */}
-        <main ref={mainContainerRef} className="flex-1 px-4 py-6 md:p-8 overflow-y-auto pb-24 md:pb-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeSection}
-              initial={{ opacity: 0, scale: 0.995 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.995 }}
-              transition={{ duration: 0.1, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {renderCenterView()}
-            </motion.div>
-          </AnimatePresence>
+        <main ref={mainContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-8">
+
+          <div className="px-4 py-6 md:px-8 md:py-6 w-full max-w-[1360px] mx-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeSection}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15, ease: 'easeInOut' }}
+              >
+                {renderCenterView()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
       </div>
 
@@ -323,58 +364,112 @@ function SolanaNetworkWidget() {
   }, []);
 
   return (
-    <div className="gradient-border-card p-4 space-y-3.5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-extrabold text-emerald-400 uppercase tracking-[0.15em]">Network Monitor</span>
-        <span className="flex h-2 w-2 relative">
-          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${stats.isOnline ? 'bg-emerald-400' : 'bg-amber-400'} opacity-75`}></span>
-          <span className={`relative inline-flex rounded-full h-2 w-2 ${stats.isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-        </span>
-      </div>
-
-      {/* Status */}
-      <div className="space-y-1">
-        <h4 className="text-sm font-bold text-foreground">Solana Devnet</h4>
-        <p className="text-[11px] text-muted-foreground">
-          {stats.isOnline ? 'All systems operational • Kora paymaster active' : 'Connecting to RPC node...'}
-        </p>
-      </div>
-
-      {/* 3-stat grid */}
-      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/30">
-        <div className="text-center">
-          <div className="text-xs font-black text-foreground font-mono stat-value">{stats.tps > 0 ? stats.tps.toLocaleString() : '...'}</div>
-          <div className="text-[9px] text-muted-foreground/60 font-semibold mt-0.5">TPS</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs font-black text-foreground font-mono stat-value">{stats.latencyMs > 0 ? `${stats.latencyMs}ms` : '...'}</div>
-          <div className="text-[9px] text-muted-foreground/60 font-semibold mt-0.5">Ping</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xs font-black text-foreground font-mono stat-value">{stats.slot > 0 ? `${(stats.slot / 1e6).toFixed(1)}M` : '...'}</div>
-          <div className="text-[9px] text-muted-foreground/60 font-semibold mt-0.5">Slot</div>
-        </div>
-      </div>
-
-      {/* Epoch progress bar */}
-      {stats.epoch > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center text-[9px] text-muted-foreground/60 font-mono">
-            <span>Epoch {stats.epoch}</span>
-            <span>{stats.epochProgress}%</span>
-          </div>
-          <div className="w-full h-1 bg-border/30 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-1000"
-              style={{
-                width: `${stats.epochProgress}%`,
-                background: 'linear-gradient(90deg, #16ffbb, #0ea5e9)',
-              }}
-            />
-          </div>
-        </div>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/40 border border-border/20 text-[11px] font-bold text-muted-foreground select-none">
+      <span className="flex h-1.5 w-1.5 relative">
+        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${stats.isOnline ? 'bg-emerald-400' : 'bg-amber-400'} opacity-75`}></span>
+        <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${stats.isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+      </span>
+      <span className="text-white/80">Solana Devnet</span>
+      {stats.isOnline && stats.latencyMs > 0 ? (
+        <span className="font-mono text-primary">({stats.latencyMs}ms)</span>
+      ) : (
+        <span className="text-amber-400">Offline</span>
       )}
+    </div>
+  );
+}
+
+/** Detailed Solana Devnet dashboard widget with 3D metrics */
+function SolanaNetworkStatsPanel() {
+  const [stats, setStats] = React.useState({ tps: 0, slot: 0, epoch: 0, epochProgress: 0, latencyMs: 0, isOnline: true });
+
+  React.useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const start = performance.now();
+        const [perfSamples, epochInfo] = await Promise.all([
+          defaultConnection.getRecentPerformanceSamples(4),
+          defaultConnection.getEpochInfo(),
+        ]);
+        const latencyMs = Math.round(performance.now() - start);
+
+        const avgTps = perfSamples.length > 0
+          ? perfSamples.reduce((sum, s) => sum + (s.numTransactions / Math.max(s.samplePeriodSecs, 1)), 0) / perfSamples.length
+          : 0;
+
+        const epochProgress = epochInfo.slotsInEpoch > 0
+          ? Math.round((epochInfo.slotIndex / epochInfo.slotsInEpoch) * 100)
+          : 0;
+
+        setStats({
+          tps: Math.round(avgTps),
+          slot: epochInfo.absoluteSlot,
+          epoch: epochInfo.epoch,
+          epochProgress,
+          latencyMs,
+          isOnline: true,
+        });
+      } catch (err) {
+        console.warn('Solana network stats fetch failed:', err);
+        setStats(prev => ({ ...prev, isOnline: false }));
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="premium-depth-card rounded-2xl p-5 space-y-4 relative overflow-hidden select-none border border-border/40">
+      <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-emerald-500/30 via-emerald-400/10 to-transparent" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-2 w-2 relative">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${stats.isOnline ? 'bg-emerald-400' : 'bg-amber-400'} opacity-75`}></span>
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${stats.isOnline ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+          </span>
+          <span className="text-xs font-black tracking-wider text-white uppercase font-sans">Solana Devnet Status</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground/80 font-bold">100% Live Sync</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* Latency */}
+        <div className="premium-depth-inset rounded-xl p-3.5 space-y-1">
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block">Ping Latency</span>
+          <span className="text-base font-black text-white font-mono">{stats.isOnline ? `${stats.latencyMs}ms` : 'Offline'}</span>
+        </div>
+        {/* TPS */}
+        <div className="premium-depth-inset rounded-xl p-3.5 space-y-1">
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block">Network TPS</span>
+          <span className="text-base font-black text-emerald-400 font-mono">{stats.isOnline ? stats.tps : '—'}</span>
+        </div>
+        {/* Epoch */}
+        <div className="premium-depth-inset rounded-xl p-3.5 space-y-1">
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block">Current Epoch</span>
+          <span className="text-base font-black text-white font-mono">#{stats.epoch}</span>
+        </div>
+        {/* Slot */}
+        <div className="premium-depth-inset rounded-xl p-3.5 space-y-1 col-span-1">
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest block">Ledger Slot</span>
+          <span className="text-sm font-black text-primary font-mono truncate block">{stats.slot.toLocaleString()}</span>
+        </div>
+      </div>
+
+      {/* Epoch Progress Bar */}
+      <div className="space-y-1.5 pt-1">
+        <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase tracking-widest">
+          <span>Epoch Progress</span>
+          <span>{stats.epochProgress}%</span>
+        </div>
+        <div className="w-full h-1.5 rounded-full bg-background/50 border border-border/20 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000"
+            style={{ width: `${stats.epochProgress}%` }}
+          />
+        </div>
+      </div>
     </div>
   );
 }

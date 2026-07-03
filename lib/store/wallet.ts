@@ -90,7 +90,7 @@ export interface WalletState {
     token: TokenSym,
     orderId: string
   ) => void;
-  swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number) => Promise<SwapResult | false>;
+  swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number, slippage?: number) => Promise<SwapResult | false>;
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
   // Blockchain functions
@@ -114,7 +114,7 @@ const getInitialData = () => {
   const initialTokens = tokenSymbols.map(symbol => ({
     symbol,
     amount: 0,
-    priceUsd: symbol === 'USDC' || symbol === 'USDT' ? 1.0 : 0.0,
+    priceUsd: 0.0,
     change24hPct: 0,
     mint: TOKEN_ADDRESSES[symbol as keyof typeof TOKEN_ADDRESSES] || '',
   }));
@@ -363,7 +363,7 @@ export const useWalletStore = create<WalletState>()(
           }
         },
 
-        swapReal: async (fromToken: TokenSym, toToken: TokenSym, amount: number) => {
+        swapReal: async (fromToken: TokenSym, toToken: TokenSym, amount: number, slippage?: number) => {
           const state = get();
           if (!state.pubkey) {
             console.warn('No pubkey available for swapReal');
@@ -393,7 +393,8 @@ export const useWalletStore = create<WalletState>()(
             const rawAmount = Math.round(amount * Math.pow(10, decimals));
 
             // Get Jupiter swap quote (uses Mainnet API for price discovery)
-            const quote = await getSwapQuote(fromMint, toMint, rawAmount);
+            const slippageBps = slippage ? Math.round(slippage * 100) : 50;
+            const quote = await getSwapQuote(fromMint, toMint, rawAmount, slippageBps);
             if (!quote || typeof quote !== 'object') {
               console.error('Failed to get swap quote:', quote);
               return false;

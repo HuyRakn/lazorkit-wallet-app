@@ -46,9 +46,21 @@ export default function RootLayout({
           href='https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap'
           rel='stylesheet'
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  document.documentElement.className = 'dark';
+                  localStorage.setItem('theme', 'dark');
+                } catch (e) {}
+              })()
+            `,
+          }}
+        />
       </head>
       <body
-        className='font-sans antialiased'
+        className='font-sans antialiased text-foreground bg-background transition-colors duration-300'
       >
         <script
           dangerouslySetInnerHTML={{
@@ -64,12 +76,13 @@ export default function RootLayout({
             <ThemeProvider
               attribute='class'
               defaultTheme='dark'
+              forcedTheme='dark'
               enableSystem={false}
               disableTransitionOnChange
             >
-            <WalletSync />
-            {children}
-            <Toaster />
+              <WalletSync />
+              {children}
+              <Toaster />
             </ThemeProvider>
           </LazorkitRootProvider>
         </Suspense>

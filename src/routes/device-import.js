@@ -297,5 +297,32 @@ router.get('/connected/:walletAddress', async (req, res, next) => {
   }
 });
 
+// POST /api/device-import/revoke
+// Revoke an approved device share
+router.post('/revoke', async (req, res, next) => {
+  try {
+    const { shareId } = req.body || {};
+    
+    if (!shareId) {
+      return res.status(400).json({ error: 'Missing shareId' });
+    }
+
+    const result = await DeviceShare.deleteOne({ shareId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Device revoked successfully'
+    });
+
+  } catch (err) {
+    console.error('Revoke device error:', err);
+    return next(err);
+  }
+});
+
 module.exports = router;
 

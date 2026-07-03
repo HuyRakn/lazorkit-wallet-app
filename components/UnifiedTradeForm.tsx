@@ -70,7 +70,7 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
       {/* 1. Dynamic Buy/Swap Form (Centered, Spacious Layout) */}
       <div className="w-full flex flex-col">
         {/* Toggle Mode Bar */}
-        <div className="flex gap-1.5 p-1 rounded-xl bg-background/50 border border-border/60 mb-6 w-full max-w-[360px] mx-auto">
+        <div className="flex gap-1.5 p-1 rounded-xl mb-6 w-full max-w-[360px] mx-auto premium-depth-inset">
           <button
             onClick={() => {
               setMode('buy');
@@ -78,7 +78,7 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
               mode === 'buy'
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                ? 'bg-gradient-to-r from-primary to-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.2)]'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -93,7 +93,7 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
             }}
             className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
               mode === 'swap'
-                ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                ? 'bg-gradient-to-r from-primary to-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.2)]'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -103,7 +103,7 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
         </div>
 
         {/* Dynamic Form Render (Stretches 100% width to match the page title) */}
-        <div className="w-full">
+        <div className="w-full premium-depth-card rounded-2xl p-6 relative z-20">
           {mode === 'buy' ? (
             <ErrorBoundary>
               <OnRampForm
@@ -246,8 +246,8 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
 
             {/* Column 3: Security Standard */}
             <div className="flex flex-col justify-center">
-              <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10 flex gap-3 items-start h-fit">
-                <Wallet className="h-5 w-5 text-purple-400 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 flex gap-3 items-start h-fit">
+                <Wallet className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
                   <span className="text-[11px] font-bold text-foreground block">Non-Custodial Account</span>
                   <p className="text-[10px] text-muted-foreground leading-relaxed">

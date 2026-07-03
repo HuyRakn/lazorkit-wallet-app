@@ -151,28 +151,26 @@ export function MarketHubView({ layout = 'full' }: MarketHubViewProps) {
       )}
 
       {/* Main Terminal Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[500px]">
         {/* Left Column: Interactive Terminal Chart (2/3 width) */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="glass-card rounded-2xl border border-border/40 p-1 bg-background/25 overflow-hidden">
-            {selectedPriceData ? (
-              <PriceChart
-                symbol={selectedPriceData.tradingViewSymbol}
-                tokenSymbol={selectedPriceData.symbol}
-                height="h-[460px]"
-              />
-            ) : (
-              <div className="h-[460px] flex flex-col items-center justify-center gap-2">
-                <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-xs text-muted-foreground">Loading Chart...</span>
-              </div>
-            )}
-          </div>
+        <div className="lg:col-span-2 lg:h-full">
+          {selectedPriceData ? (
+            <PriceChart
+              symbol={selectedPriceData.tradingViewSymbol}
+              tokenSymbol={selectedPriceData.symbol}
+              height="lg:h-full h-[320px]"
+            />
+          ) : (
+            <div className="lg:h-full h-[320px] flex flex-col items-center justify-center gap-2 glass-card rounded-xl p-4">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-xs text-muted-foreground">Loading Chart...</span>
+            </div>
+          )}
         </div>
 
         {/* Right Column: Live Rankings & Hot Pairs (1/3 width) */}
-        <div className="space-y-5 flex flex-col justify-start">
-          <div className="glass-card rounded-2xl border border-border/40 p-5 bg-background/25 flex flex-col space-y-4">
+        <div className="lg:h-full">
+          <div className="glass-card rounded-2xl border border-border/40 p-5 bg-background/25 flex flex-col space-y-4 lg:h-full">
             <div className="flex items-center justify-between pb-3 border-b border-border/40">
               <div className="flex items-center gap-2">
                 <Coins className="h-4.5 w-4.5 text-primary" />
@@ -196,7 +194,7 @@ export function MarketHubView({ layout = 'full' }: MarketHubViewProps) {
                 <span className="text-[10px] text-muted-foreground">Syncing prices...</span>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+              <div className="space-y-2 lg:flex-1 lg:max-h-none max-h-[320px] overflow-y-auto pr-1">
                 {sortedTokens.map((token) => {
                   const isSelected = selectedToken === token.symbol;
                   const isUp = token.change24h >= 0;
@@ -244,18 +242,6 @@ export function MarketHubView({ layout = 'full' }: MarketHubViewProps) {
                 })}
               </div>
             )}
-          </div>
-
-          {/* RampFi Sponsored Integration Widget */}
-          <div className="bg-gradient-to-br from-primary/10 via-purple-500/5 to-background border border-primary/20 rounded-2xl p-5 relative overflow-hidden space-y-3">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
-            <div className="flex items-center gap-2 text-primary font-bold text-[10px] uppercase tracking-wider">
-              <Award className="h-4 w-4" /> Liquidity Sponsor
-            </div>
-            <h4 className="text-sm font-extrabold text-foreground">Solana Jupiter Routing Ecosystem</h4>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Explore dynamic pricing aggregates directly sourced from Jupiter API. Execute transactions instantly with zero-delay updates.
-            </p>
           </div>
         </div>
       </div>

@@ -31,9 +31,9 @@ export function PriceChart({ symbol, tokenSymbol, height = 'h-[220px]' }: PriceC
   }, [symbol, timeframe]);
 
   return (
-    <div className="glass-card rounded-xl p-4 space-y-3.5 border border-border/40 select-none">
+    <div className="glass-card rounded-xl p-4 space-y-3.5 select-none lg:h-full lg:flex lg:flex-col">
       {/* Header Info */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between font-sans">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-[10px] font-black text-primary">
             {tokenSymbol.slice(0, 2)}
@@ -61,7 +61,7 @@ export function PriceChart({ symbol, tokenSymbol, height = 'h-[220px]' }: PriceC
       </div>
 
       {/* TradingView Widget Iframe wrapper */}
-      <div className={`relative w-full ${height} bg-[#131722]/80 rounded-lg overflow-hidden border border-border/40`}>
+      <div className={`relative w-full ${height} bg-[#131722]/80 rounded-lg overflow-hidden lg:flex-1`}>
         {iframeUrl ? (
           <iframe
             id="tradingview_chart"

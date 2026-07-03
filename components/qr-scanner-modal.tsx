@@ -228,9 +228,12 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
                 </div>
               ) : hasPermission === true ? (
                 <div className="space-y-4">
-                  <div className="relative w-full h-64 bg-gray-800 rounded-lg overflow-hidden border-2 border-[#16ffbb]/30">
+                  <div className="relative w-full h-64 bg-gray-800 rounded-lg overflow-hidden border border-[#16ffbb]/30">
                     <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-                    <div className="absolute inset-0 border-2 border-[#16ffbb] rounded-lg pointer-events-none animate-pulse"></div>
+                    {/* Laser line effect */}
+                    <div className="absolute left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#16ffbb] to-transparent shadow-[0_0_8px_#16ffbb] pointer-events-none animate-laser" />
+                    {/* Soft grid overlay in scanner area */}
+                    <div className="absolute inset-0 border border-[#16ffbb]/40 rounded-lg pointer-events-none"></div>
                   </div>
                   {error && (
                     <div className="text-center text-red-300 text-sm bg-red-900/20 rounded-lg p-3">

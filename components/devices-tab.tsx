@@ -8,6 +8,7 @@ import { QRScannerModal } from './qr-scanner-modal';
 import { DeviceApprovalModal } from './device-approval-modal';
 import { useWalletStore } from '@/lib/store/wallet';
 import { useToast } from '@/hooks/use-toast';
+import { motion } from 'framer-motion';
 
 export const DevicesTab = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
@@ -242,9 +243,43 @@ export const DevicesTab = () => {
     }
   };
 
+  const handleRevoke = async (shareId: string) => {
+    if (!shareId) return;
+    try {
+      const resp = await fetch(`${apiBase}/api/device-import/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shareId })
+      });
+
+      if (resp.ok) {
+        toast({
+          title: 'Device Revoked',
+          description: 'The key share has been deleted from the database.',
+        });
+        await loadConnectedDevices();
+        await loadPendingDevices();
+      } else {
+        toast({
+          title: 'Revocation failed',
+          description: 'Failed to revoke device access.',
+          variant: 'destructive'
+        });
+      }
+    } catch (err) {
+      console.error('Revocation error:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to connect to security service.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const unifiedRows = [
     ...connectedDevices.map((d: any) => ({
       id: d._id || d.shareId || Math.random().toString(36).slice(2),
+      shareId: d.shareId,
       platform: d.newDeviceData?.platform || 'Web Browser',
       browser: d.newDeviceData?.browser || 'Chrome',
       os: d.newDeviceData?.os || 'macOS',
@@ -253,6 +288,7 @@ export const DevicesTab = () => {
     })),
     ...pendingDevices.map((d: any) => ({
       id: d._id || d.shareId || Math.random().toString(36).slice(2),
+      shareId: d.shareId,
       platform: d.platform || 'Mobile device',
       browser: d.browser || 'Safari',
       os: d.os || 'iOS',
@@ -279,17 +315,17 @@ export const DevicesTab = () => {
         <div className="space-y-6 flex flex-col justify-start">
           
           {/* Active Device List Card */}
-          <Card className="bg-[#0b0c10]/40 border-white/[0.06] backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col">
-            <CardHeader className="border-b border-white/[0.06] pb-4">
-              <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <div className="glass-card rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col">
+            <div className="p-5 border-b border-border/10 pb-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <ShieldCheck className="h-4.5 w-4.5 text-primary" />
                 Active Vault Keys
-              </CardTitle>
-              <CardDescription className="text-[11px] text-muted-foreground">
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Devices permitted to initialize signatures.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0 divide-y divide-white/[0.06] flex-1 overflow-y-auto">
+              </p>
+            </div>
+            <div className="p-0 divide-y divide-border/10 flex-1 overflow-y-auto">
               {unifiedRows.length === 0 ? (
                 <div className="p-12 text-center flex flex-col items-center justify-center h-full gap-4">
                   <div className="w-12 h-12 rounded-full bg-white/[0.02] border border-white/10 flex items-center justify-center text-muted-foreground">
@@ -320,44 +356,61 @@ export const DevicesTab = () => {
                         <p className="text-[10px] text-muted-foreground">{row.browser} ({row.os})</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        row.status === 'Connected'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                      }`}>
-                        <span className={`w-1 h-1 rounded-full ${row.status === 'Connected' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-                        {row.status}
-                      </span>
-                      <p className="text-[9px] text-muted-foreground/80 mt-1">{row.date ? row.date.toLocaleDateString() : ''}</p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          row.status === 'Connected'
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          <span className={`w-1 h-1 rounded-full ${row.status === 'Connected' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                          {row.status}
+                        </span>
+                        <p className="text-[9px] text-muted-foreground/80 mt-1">{row.date ? row.date.toLocaleDateString() : ''}</p>
+                      </div>
+
+                      {row.status === 'Connected' && row.shareId && (
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            if (confirm('Are you absolutely sure you want to revoke this device\'s signing key?')) {
+                              handleRevoke(row.shareId);
+                            }
+                          }}
+                          className="px-3 py-1.5 text-[10px] font-bold text-red-400 hover:text-white bg-red-500/10 hover:bg-red-500 border border-red-500/30 hover:border-red-500 rounded-lg shadow-sm hover:shadow-red-500/20 transition-colors duration-200 cursor-pointer"
+                        >
+                          Revoke Access
+                        </motion.button>
+                      )}
                     </div>
                   </div>
                 ))
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
         </div>
 
         {/* RIGHT COLUMN: Pairing Portal (Scan Phone QR / Display Laptop Sync QR) */}
         <div className="space-y-6 flex flex-col justify-start">
           
-          <Card className="bg-[#0b0c10]/40 border-white/[0.06] backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col justify-between">
-            <CardHeader className="border-b border-white/[0.06] pb-4">
-              <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+          <div className="glass-card rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col justify-between">
+            <div className="p-5 border-b border-border/10 pb-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <QrCode className="h-4.5 w-4.5 text-primary" />
                 Pairing Portal
-              </CardTitle>
-              <CardDescription className="text-[11px] text-muted-foreground">
+              </h3>
+              <p className="text-[11px] text-muted-foreground mt-1">
                 Authorize a new device using secure QR codes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 flex-1 flex flex-col justify-between gap-6">
+              </p>
+            </div>
+            <div className="p-6 flex-1 flex flex-col justify-between gap-6">
               
               {/* Option A: Device Camera Scan */}
-              <div className="p-4 bg-white/[0.01] border border-white/[0.04] rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-6 border-b border-border/10">
                 <div className="space-y-1">
-                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5 uppercase tracking-wider">
                     <Camera className="h-3.5 w-3.5 text-primary" />
                     Scan Phone QR
                   </h4>
@@ -367,14 +420,14 @@ export const DevicesTab = () => {
                 </div>
                 <Button
                   onClick={() => setShowQRScanner(true)}
-                  className="bg-primary hover:bg-primary/90 text-black font-extrabold text-xs px-4 py-2 rounded-xl shrink-0 w-full md:w-auto"
+                  className="bg-primary hover:bg-primary/95 text-white font-extrabold text-xs px-4 py-2 rounded-xl shrink-0 w-full md:w-auto transition-all"
                 >
                   Open Scanner
                 </Button>
               </div>
 
               {/* Option B: Display pairing QR code on screen */}
-              <div className="border border-white/[0.04] bg-white/[0.01] rounded-2xl p-5 flex flex-col items-center justify-center gap-4 flex-1">
+              <div className="flex flex-col items-center justify-center gap-4 flex-1 py-4">
                 {qrCodeURL ? (
                   <div className="flex flex-col items-center justify-center gap-3">
                     <div className="p-3 bg-black rounded-xl border border-white/10 shadow-lg">
@@ -391,7 +444,7 @@ export const DevicesTab = () => {
                       <QrCode className="h-5 w-5" />
                     </div>
                     <div className="space-y-1">
-                      <h4 className="text-xs font-bold text-white">Display Laptop Sync QR</h4>
+                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Display Laptop Sync QR</h4>
                       <p className="text-[10px] text-muted-foreground max-w-[260px] mx-auto leading-normal">
                         Show a temporary pairing code on this screen. Open RampFi on your phone to scan it.
                       </p>
@@ -399,7 +452,7 @@ export const DevicesTab = () => {
                     <Button
                       onClick={generatePairingQR}
                       disabled={isGenerating}
-                      className="bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/10 font-bold text-xs px-5 py-2.5 rounded-xl transition-all"
+                      className="bg-card/50 hover:bg-card text-white border border-border/40 hover:border-primary/45 font-bold text-xs px-5 py-2.5 rounded-xl transition-all"
                     >
                       {isGenerating ? 'Generating...' : 'Generate Sync QR'}
                     </Button>
@@ -414,8 +467,8 @@ export const DevicesTab = () => {
                 )}
               </div>
 
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
         </div>
 

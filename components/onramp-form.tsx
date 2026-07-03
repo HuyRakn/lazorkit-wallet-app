@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Settings2, ChevronDown, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -67,6 +68,22 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [passkeyDataRef, setPasskeyDataRef] = useState<any>(null);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (showCurrencySelect || showTokenSelect) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showCurrencySelect, showTokenSelect]);
 
   const amountNum = parseFloat(amount.replace(/,/g, '')) || 0;
   const amountUsd =
@@ -215,7 +232,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
 
   return (
     <>
-      <div className='p-4 pt-3'>
+      <div className='space-y-4'>
         <div className='flex items-center justify-between mb-2'>
           <div className='text-sm font-medium'>{t('onRamp.title')}</div>
           <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
@@ -223,19 +240,20 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
           </button>
         </div>
 
-        <div className='space-y-0'>
-          <div className='bg-muted/5 rounded-t-lg p-2.5 pb-3 border border-b-0 border-border/50'>
+        <div className='relative rounded-2xl overflow-hidden premium-depth-inset'>
+          {/* Paying Section */}
+          <div className='p-4 pb-5'>
             <div className='flex items-start justify-between'>
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>{t('onRamp.paying')}</div>
                 <button
                   onClick={() => setShowCurrencySelect(true)}
-                  className='flex items-center gap-1.5 px-3 p-1 rounded-full bg-card hover:bg-muted/20 transition-colors border border-border/50'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
                 >
                   <span className='text-lg text-primary'>
                     {currencyIcons[fromCurrency]}
                   </span>
-                  <span className='font-medium text-sm'>{fromCurrency}</span>
+                  <span className='font-medium text-xs text-white'>{fromCurrency}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -252,7 +270,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                   placeholder={fromCurrency === 'VND' ? '1,000,000' : '100.00'}
                   value={formatDisplayValue(amount)}
                   onChange={(e) => handleAmountChange(e.target.value)}
-                  className='text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground'
+                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-white mobile-input'
                 />
                 <div className='text-xs text-muted-foreground mt-0.5'>
                   {fromCurrency === 'VND'
@@ -263,7 +281,11 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             </div>
           </div>
 
-          <div className='bg-muted/5 rounded-b-lg p-2.5 pb-3 border border-border/50'>
+          {/* Divider Line */}
+          <div className='border-b border-border/10' />
+
+          {/* Receiving Section */}
+          <div className='p-4 pt-5'>
             <div className='flex items-start justify-between'>
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>
@@ -271,12 +293,12 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 </div>
                 <button
                   onClick={() => setShowTokenSelect(true)}
-                  className='flex items-center gap-1.5 px-3 py-2 rounded-full bg-card hover:bg-muted/20 transition-colors border border-border/50'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm'>{toToken}</span>
+                  <span className='font-medium text-sm text-white'>{toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -287,7 +309,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                     {t('common.price')}: 1 {toToken} = ${tokenPrice?.toFixed(2) || '1.00'}
                   </span>
                 </div>
-                <div className='text-2xl font-semibold text-muted-foreground/50'>
+                <div className='text-xl sm:text-2xl font-semibold text-white/50'>
                   {estimatedReceive > 0
                     ? formatDisplayValue(estimatedReceive.toFixed(6))
                     : '0.000000'}
@@ -300,9 +322,9 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
           </div>
         </div>
 
-        <div className='mt-2.5 mb-2.5'>
-          <div className='text-xs text-muted-foreground mb-1'>{t('onRamp.quickAmount')}</div>
-          <div className='flex gap-1'>
+        <div className='mt-3.5 mb-3.5'>
+          <div className='text-xs text-muted-foreground mb-1.5 font-bold uppercase tracking-wider text-[10px]'>{t('onRamp.quickAmount')}</div>
+          <div className='flex gap-1.5'>
             {quickAmounts.map((usdAmount) => {
               const isSelected =
                 selectedQuickAmount === usdAmount &&
@@ -314,10 +336,10 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 <button
                   key={usdAmount}
                   onClick={() => handleQuickAmountClick(usdAmount)}
-                  className={`flex-1 py-1.5 px-1 text-xs font-medium rounded-lg border transition-all ${
+                  className={`flex-1 py-1.5 px-1 text-xs font-bold rounded-lg transition-all ${
                     isSelected
-                      ? 'bg-primary/10 border-primary/50 text-primary'
-                      : 'bg-muted/5 border-border/50 hover:bg-muted/10'
+                      ? 'premium-depth-btn text-[11px]'
+                      : 'premium-depth-btn-secondary text-[11px]'
                   }`}
                 >
                   ${usdAmount}
@@ -334,10 +356,10 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
 
         <Button
           onClick={handlePreview}
-          className={`w-full py-2.5 rounded-lg font-semibold text-sm ${
-            !amount || !!error || amountNum <= 0
+          className={`w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider ${
+            !amount || !!error || amountNum <= 0 || isCreatingOrder
               ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary hover:bg-primary/90'
+              : 'premium-depth-btn'
           }`}
           disabled={!amount || !!error || amountNum <= 0 || isCreatingOrder}
         >
@@ -351,9 +373,9 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
         </div>
       </div>
 
-      {showCurrencySelect && (
+      {showCurrencySelect && mounted && createPortal(
         <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
           style={{ animation: 'fadeIn 0.2s ease-out' }}
           onClick={() => setShowCurrencySelect(false)}
         >
@@ -444,7 +466,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
 
             <div className='px-4 py-2'>
               <div className='border-t border-border/40 relative'>
-                <div className='absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 bg-card'>
+                <div className='absolute -top-2.5 left-1/2 -translate-x-1/2 px-2' style={{ backgroundColor: 'var(--card)' }}>
                   <span className='text-[10px] text-muted-foreground uppercase tracking-wider font-medium'>
                     {t('swap.selectToken')}
                   </span>
@@ -501,12 +523,13 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               </div>
             </div>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showTokenSelect && (
+      {showTokenSelect && mounted && createPortal(
         <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
           style={{ animation: 'fadeIn 0.2s ease-out' }}
           onClick={() => setShowTokenSelect(false)}
         >
@@ -592,7 +615,8 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               })}
             </div>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
 
       <OnRampPreviewModal

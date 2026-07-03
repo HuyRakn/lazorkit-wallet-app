@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowUpDown, Settings2, ChevronDown, Sparkles, RefreshCcw, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -8,6 +9,7 @@ import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
 import { useWalletStore, TokenSym, SwapResult } from '@/lib/store/wallet';
 import { useWallet } from '@/hooks/use-lazorkit-wallet';
+import { motion } from 'framer-motion';
 import { formatTokenAmount, formatCurrency } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
 import { SwapReviewModal } from './swap-review-modal';
@@ -70,6 +72,22 @@ export const SwapForm = ({
   const [quote, setQuote] = useState<SwapData['quote'] | undefined>(undefined);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [quoteCountdown, setQuoteCountdown] = useState(30);
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (showTokenSelect) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showTokenSelect]);
 
   // Sync with provided initial tokens if props change
   useEffect(() => {
@@ -279,7 +297,7 @@ export const SwapForm = ({
 
   return (
     <>
-      <div className='p-4 pt-3 mobile-padding'>
+      <div className='space-y-4'>
         {/* Header with Ultra V2 and settings - Compact */}
         <div className='flex items-center justify-between mb-2'>
           <button className='flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors'>
@@ -295,9 +313,9 @@ export const SwapForm = ({
         </div>
 
         {/* Two Adjacent Input Sections with Overlapping Swap Button */}
-        <div className='relative'>
+        <div className='relative rounded-2xl overflow-hidden premium-depth-inset'>
           {/* Selling Section */}
-          <div className='bg-muted/5 rounded-t-lg p-2.5 pb-3 border border-b-0 border-border/50'>
+          <div className='p-4 pb-5'>
             <div className='flex items-start justify-between'>
               {/* Left side - Label and selector */}
               <div>
@@ -306,12 +324,12 @@ export const SwapForm = ({
                 </div>
                 <button
                   onClick={() => setShowTokenSelect('from')}
-                  className='flex items-center gap-1.5 px-3 py-2 rounded-full bg-card hover:bg-muted/20 transition-colors border border-border/50'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(fromToken)}
                   </div>
-                  <span className='font-medium text-sm'>{fromToken}</span>
+                  <span className='font-medium text-xs text-white'>{fromToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -326,13 +344,13 @@ export const SwapForm = ({
                     <>
                       <button
                         onClick={handleHalfClick}
-                        className='px-2 py-0.5 text-[10px] font-medium rounded bg-muted/20 hover:bg-muted/30 transition-colors'
+                        className='px-2 py-0.5 text-[10px] font-bold rounded premium-depth-btn-secondary'
                       >
                         HALF
                       </button>
                       <button
                         onClick={handleMaxClick}
-                        className='px-2 py-0.5 text-[10px] font-medium rounded bg-muted/20 hover:bg-muted/30 transition-colors'
+                        className='px-2 py-0.5 text-[10px] font-bold rounded premium-depth-btn-secondary'
                       >
                         MAX
                       </button>
@@ -347,7 +365,7 @@ export const SwapForm = ({
                   onChange={(e) =>
                     handleAmountChange(e.target.value.replace(/,/g, ''))
                   }
-                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-foreground mobile-input'
+                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-white mobile-input'
                 />
                 <div className='text-xs text-muted-foreground mt-0.5'>
                   {formatCurrency(amountUsd, 'USD')}
@@ -356,30 +374,36 @@ export const SwapForm = ({
             </div>
           </div>
 
-          {/* Swap Button - Overlapping both inputs */}
-          <div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10'>
-            <button
+          {/* Divider line */}
+          <div className='border-b border-border/10' />
+
+          {/* Enhanced Swap Button - Cosmic 3D Depth Overlap */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+            <motion.button
+              whileHover={{ scale: 1.1, rotate: 180 }}
+              whileTap={{ scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 450, damping: 22 }}
               onClick={handleSwapTokens}
-              className='p-2 rounded-full bg-card hover:bg-muted/20 transition-colors border-2 border-border shadow-lg'
+              className="p-3 rounded-full bg-card border border-primary/30 text-white shadow-[0_0_15px_rgba(22,255,187,0.25),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:border-primary cursor-pointer active:scale-95"
             >
-              <ArrowUpDown className='h-4 w-4 text-foreground' />
-            </button>
+              <ArrowUpDown className="h-4.5 w-4.5 text-primary" />
+            </motion.button>
           </div>
 
           {/* Buying Section */}
-          <div className='bg-muted/5 rounded-b-lg p-2.5 pb-3 border border-border/50'>
+          <div className='p-4 pt-5'>
             <div className='flex items-start justify-between'>
               {/* Left side - Label and selector */}
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>{t('swap.to')}</div>
                 <button
                   onClick={() => setShowTokenSelect('to')}
-                  className='flex items-center gap-1.5 px-3 py-2 rounded-full bg-card hover:bg-muted/20 transition-colors border border-border/50'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm'>{toToken}</span>
+                  <span className='font-medium text-sm text-white'>{toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -393,14 +417,14 @@ export const SwapForm = ({
                     </span>
                   )}
                 </div>
-                <div className='text-xl sm:text-2xl font-semibold text-muted-foreground/50 transition-all duration-300'>
+                <div className='text-xl sm:text-2xl font-semibold text-white/50 transition-all duration-300'>
                   {loadingQuote ? (
-                    <div className='flex items-center gap-2 animate-pulse'>
+                    <div className='flex items-center gap-2 justify-end animate-pulse'>
                       <RefreshCcw className='h-4 w-4 animate-spin' />
                       <span className='mobile-text-sm'>Loading...</span>
                     </div>
                   ) : estimatedReceive > 0 ? (
-                    <span className='animate-fade-in'>{formatDisplayValue(estimatedReceive.toFixed(6))}</span>
+                    <span className='animate-fade-in text-white'>{formatDisplayValue(estimatedReceive.toFixed(6))}</span>
                   ) : (
                     '0.00'
                   )}
@@ -415,10 +439,10 @@ export const SwapForm = ({
 
         {/* Quote Info Bar */}
         {quote && amountNum > 0 && (
-          <div className='mt-2 p-2.5 rounded-lg bg-muted/5 border border-border/30 space-y-1.5'>
+          <div className='mt-3 p-3 rounded-xl bg-background/20 border border-border/10 space-y-1.5'>
             <div className='flex items-center justify-between text-[10px]'>
               <span className='text-muted-foreground'>Rate</span>
-              <span className='font-mono text-foreground'>1 {fromToken} = {(estimatedReceive / amountNum).toFixed(6)} {toToken}</span>
+              <span className='font-mono text-white'>1 {fromToken} = {(estimatedReceive / amountNum).toFixed(6)} {toToken}</span>
             </div>
             {quote.priceImpactPct && (
               <div className='flex items-center justify-between text-[10px]'>
@@ -430,7 +454,7 @@ export const SwapForm = ({
             )}
             <div className='flex items-center justify-between text-[10px]'>
               <span className='text-muted-foreground'>Route</span>
-              <span className='text-foreground'>{quote.routePlan?.length ? `${quote.routePlan.length} hop${quote.routePlan.length > 1 ? 's' : ''}` : 'Direct'}</span>
+              <span className='text-white'>{quote.routePlan?.length ? `${quote.routePlan.length} hop${quote.routePlan.length > 1 ? 's' : ''}` : 'Direct'}</span>
             </div>
             <div className='flex items-center justify-between text-[10px]'>
               <span className='text-muted-foreground'>Gas Fee</span>
@@ -444,17 +468,17 @@ export const SwapForm = ({
         )}
 
         {/* Slippage Settings */}
-        <div className='mt-2.5 mb-2.5'>
-          <div className='text-xs text-muted-foreground mb-1'>Slippage Tolerance</div>
-          <div className='flex gap-1'>
+        <div className='mt-3.5 mb-3.5'>
+          <div className='text-xs text-muted-foreground mb-1.5 font-bold uppercase tracking-wider text-[10px]'>Slippage Tolerance</div>
+          <div className='flex gap-1.5'>
             {[0.1, 0.5, 1, 2].map((value) => (
               <button
                 key={value}
                 onClick={() => setSlippage(value)}
-                className={`flex-1 py-1 text-xs rounded transition-all ${
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   slippage === value
-                    ? 'bg-primary/20 text-primary border border-primary/30'
-                    : 'bg-muted/10 hover:bg-muted/20 border border-border/30'
+                    ? 'premium-depth-btn text-[11px]'
+                    : 'premium-depth-btn-secondary text-[11px]'
                 }`}
               >
                 {value}%
@@ -466,52 +490,52 @@ export const SwapForm = ({
         {/* Action Button */}
         <Button
           onClick={handlePreview}
-          className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-300 button-press ${
+          className={`w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-wider ${
             !amount || !!error || amountNum <= 0
               ? 'bg-muted text-muted-foreground cursor-not-allowed'
-              : 'bg-primary hover:bg-primary/90 hover:scale-[1.02] active:scale-[0.98] pulse-important'
+              : 'premium-depth-btn'
           }`}
           disabled={!amount || !!error || amountNum <= 0}
         >
           {error || (!amount ? t('swap.enterAmount') : t('swap.confirm'))}
         </Button>
 
-        {/* Token Prices Footer - Individual borders */}
-        <div className='flex items-center justify-between gap-2 mt-2.5'>
-          <div className='flex items-center gap-2 p-2 border border-border/30 rounded-lg bg-muted/5 flex-1'>
-            <div className='flex items-center'>{getTokenIcon(fromToken)}</div>
-            <div className='flex-1'>
-              <div className='text-xs font-medium'>{fromToken}</div>
-              <div className='text-[10px] text-muted-foreground truncate'>
+        {/* Token Prices Footer - Flat Row */}
+        <div className='flex items-center justify-between gap-4 mt-4 pt-4 border-t border-border/10'>
+          <div className='flex items-center gap-2 flex-1'>
+            <div className='flex items-center'>{getTokenIcon(fromToken, 18)}</div>
+            <div className='flex-1 min-w-0'>
+              <div className='text-[11px] font-bold text-white'>{fromToken}</div>
+              <div className='text-[9px] text-muted-foreground truncate'>
                 {tokenData?.get(fromToken)?.id?.slice(0, 4) || ''}...
                 {tokenData?.get(fromToken)?.id?.slice(-4) || ''}
               </div>
             </div>
-            <div className='text-right'>
-              <div className='text-xs font-medium'>{formatCurrency(fromPrice, 'USD')}</div>
+            <div className='text-right shrink-0'>
+              <div className='text-[11px] font-bold text-white'>{formatCurrency(fromPrice, 'USD')}</div>
             </div>
           </div>
 
-          <div className='flex items-center gap-2 p-2 border border-border/30 rounded-lg bg-muted/5 flex-1'>
-            <div className='flex items-center'>{getTokenIcon(toToken)}</div>
-            <div className='flex-1'>
-              <div className='text-xs font-medium'>{toToken}</div>
-              <div className='text-[10px] text-muted-foreground truncate'>
+          <div className='flex items-center gap-2 flex-1'>
+            <div className='flex items-center'>{getTokenIcon(toToken, 18)}</div>
+            <div className='flex-1 min-w-0'>
+              <div className='text-[11px] font-bold text-white'>{toToken}</div>
+              <div className='text-[9px] text-muted-foreground truncate'>
                 {tokenData?.get(toToken)?.id?.slice(0, 4) || ''}...
                 {tokenData?.get(toToken)?.id?.slice(-4) || ''}
               </div>
             </div>
-            <div className='text-right'>
-              <div className='text-xs font-medium'>{formatCurrency(toPrice, 'USD')}</div>
+            <div className='text-right shrink-0'>
+              <div className='text-[11px] font-bold text-white'>{formatCurrency(toPrice, 'USD')}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Enhanced Token Selection Modal */}
-      {showTokenSelect && (
+      {showTokenSelect && mounted && createPortal(
         <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
+          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
           style={{ animation: 'fadeIn 0.2s ease-out' }}
           onClick={() => {
             setShowTokenSelect(null);
@@ -690,7 +714,8 @@ export const SwapForm = ({
               </div>
             </div>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
 
       <SwapReviewModal
@@ -705,7 +730,7 @@ export const SwapForm = ({
         onConfirm={async () => {
           try {
             // Step 1: Get the swap transaction from Jupiter via store
-            const result = swapReal ? await swapReal(fromToken, toToken, amountNum) : false;
+            const result = swapReal ? await swapReal(fromToken, toToken, amountNum, slippage) : false;
             
             if (!result) {
               toast({
@@ -753,7 +778,7 @@ export const SwapForm = ({
               amount: amountNum,
               token: fromToken,
               status: isDevnetSimulated ? 'Simulated' : 'Success',
-              tx: signature || undefined,
+              txSignature: signature || undefined,
             };
             addActivity?.(activity as any);
 
