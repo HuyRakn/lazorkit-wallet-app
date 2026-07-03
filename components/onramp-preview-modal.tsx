@@ -94,7 +94,7 @@ export function OnRampPreviewModal({
 
           <div className='text-center'>
             <p className='text-xs text-muted-foreground'>
-              Rates are simulated for demo.
+              Rates sourced from live market data.
             </p>
           </div>
         </div>

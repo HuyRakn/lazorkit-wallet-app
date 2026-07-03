@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Clipboard, QrCode, ArrowRight, Wallet } from 'lucide-react';
+import { Send, Clipboard, QrCode, ArrowRight, Wallet, ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { ViewportModal } from './ui/viewport-modal';
 import { Input } from './ui/input';
@@ -14,7 +14,6 @@ import { PublicKey, SystemProgram } from '@solana/web3.js';
 import * as splToken from '@solana/spl-token';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
-import { t } from '@/lib/i18n';
 import { toast } from '@/hooks/use-toast';
 
 interface SendModalViewportProps {
@@ -23,35 +22,36 @@ interface SendModalViewportProps {
 }
 
 export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps) => {
-  const { tokens, pubkey, addActivity } = useWalletStore();
+  const { tokens, pubkey, addActivity, refreshBalances } = useWalletStore();
   const lz = useWallet() as any;
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
 
   const selectedTokenData = tokens.find((t) => t.symbol === selectedToken);
   const amountNum = parseFloat(amount) || 0;
 
   const validateForm = () => {
     if (!recipient.trim()) {
-      setError(t('send.enterRecipient'));
+      setError('Please enter a recipient address');
       return false;
     }
 
     if (!isValidSolanaAddress(recipient)) {
-      setError(t('send.invalidAddress'));
+      setError('Invalid Solana address format');
       return false;
     }
 
     if (!amount || amountNum <= 0) {
-      setError(t('send.enterAmount'));
+      setError('Please enter a valid amount');
       return false;
     }
 
     if (!selectedTokenData || amountNum > selectedTokenData.amount) {
-      setError(t('send.insufficientBalance'));
+      setError('Insufficient balance for this transfer');
       return false;
     }
 
@@ -62,18 +62,19 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
   const handleSend = async () => {
     if (!validateForm()) return;
     if (!pubkey) {
-      toast({ title: t('common.error'), description: t('send.noWallet'), variant: 'destructive' });
+      toast({ title: 'Error', description: 'Wallet not connected', variant: 'destructive' });
       return;
     }
 
     setIsProcessing(true);
+    setTxSignature(null);
     try {
       const activeAddress = (lz as any)?.address || pubkey;
       if (!activeAddress) throw new Error('Wallet not ready');
       const ownerPk = new PublicKey(activeAddress);
       const recipientPk = new PublicKey(recipient);
 
-      if (!lz?.signAndSendTransaction) throw new Error('signAndSendTransaction not available');
+      if (!lz?.signAndSendTransaction) throw new Error('Biometric signature provider not initialized.');
 
       let sig: string;
       if (selectedToken === 'SOL') {
@@ -124,6 +125,8 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         sig = await lz.signAndSendTransaction(instructions);
       }
 
+      setTxSignature(sig);
+
       addActivity?.({
         id: Date.now().toString(),
         kind: 'send',
@@ -137,20 +140,27 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
       } as any);
 
       toast({
-        title: t('send.transactionSent'),
-        description: `${amountNum} ${selectedToken} ${t('send.sentSuccessfully')}`,
+        title: '✅ Transfer Confirmed',
+        description: `${amountNum} ${selectedToken} sent successfully on Solana Devnet`,
       });
 
-      setRecipient('');
-      setAmount('');
-      setError('');
-      onOpenChange(false);
+      // Refresh balances after transfer
+      setTimeout(() => refreshBalances?.().catch(console.error), 3000);
+
     } catch (e: any) {
       console.error('Send failed:', e);
-      toast({ title: t('common.error'), description: e?.message || 'Send failed', variant: 'destructive' });
+      toast({ title: 'Transfer Failed', description: e?.message || 'Transaction failed on Solana Devnet', variant: 'destructive' });
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleClose = () => {
+    setRecipient('');
+    setAmount('');
+    setError('');
+    setTxSignature(null);
+    onOpenChange(false);
   };
 
   const handleMaxClick = () => {
@@ -177,8 +187,8 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
     } catch (error) {
       console.error('Error pasting from clipboard:', error);
       toast({
-        title: t('common.error'),
-        description: t('send.pasteFailed'),
+        title: 'Paste Error',
+        description: 'Failed to read from clipboard. Please paste manually.',
         variant: 'destructive',
       });
     }
@@ -191,11 +201,62 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
     label: `${token.symbol} - ${formatTokenAmount(token.amount, token.symbol)}`,
   }));
 
+  // Success state after transaction
+  if (txSignature) {
+    return (
+      <ViewportModal
+        open={open}
+        onOpenChange={handleClose}
+        title="Transfer Complete"
+        className="max-w-md"
+      >
+        <div className="p-6 space-y-5 text-center">
+          <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
+          <div>
+            <h3 className="text-base font-bold text-foreground">Transfer Successful</h3>
+            <p className="text-xs text-muted-foreground mt-1">Your gasless transaction has been confirmed on Solana Devnet.</p>
+          </div>
+
+          <div className="bg-background/40 border border-border/40 p-4 rounded-xl text-left space-y-2 text-xs font-mono text-muted-foreground">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground/60">Amount:</span>
+              <span className="font-semibold text-foreground">{amountNum} {selectedToken}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground/60">To:</span>
+              <span>{recipient.slice(0, 6)}...{recipient.slice(-6)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground/60">Gas Fee:</span>
+              <span className="text-emerald-400 font-bold">$0.00 (Sponsored)</span>
+            </div>
+          </div>
+
+          <a
+            href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-bold"
+          >
+            View on Solana Explorer <ExternalLink className="w-3 h-3" />
+          </a>
+
+          <Button
+            onClick={handleClose}
+            className="w-full h-11 bg-primary text-primary-foreground font-semibold rounded-xl"
+          >
+            Done
+          </Button>
+        </div>
+      </ViewportModal>
+    );
+  }
+
   return (
     <ViewportModal
       open={open}
-      onOpenChange={onOpenChange}
-      title={t('send.title')}
+      onOpenChange={handleClose}
+      title="Send Tokens"
       className="max-w-md"
     >
       <div className="p-4 space-y-4">
@@ -203,20 +264,20 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         <div className="space-y-2">
           <Label className="text-sm font-medium flex items-center gap-2">
             <Wallet className="h-4 w-4" />
-            {t('send.selectToken')}
+            Select Token
           </Label>
           <SimpleSelect
             value={selectedToken}
             onValueChange={(value: string) => setSelectedToken(value as TokenSym)}
             options={tokenOptions}
-            placeholder={t('send.selectToken')}
+            placeholder="Select Token"
             className="h-10"
           />
           {selectedTokenData && (
             <div className="p-2 bg-muted/30 rounded-lg">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground">
-                  {t('send.availableBalance')}
+                  Available Balance
                 </span>
                 <span className="font-medium">
                   {formatTokenAmount(selectedTokenData.amount, selectedTokenData.symbol)}
@@ -229,12 +290,12 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         {/* Recipient Address */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            {t('send.recipient')}
+            Recipient Address
           </Label>
           <div className="space-y-2">
             <div className="flex gap-2">
               <Input
-                placeholder={t('send.enterAddress')}
+                placeholder="Enter Solana address"
                 value={recipient}
                 onChange={(e) => {
                   setRecipient(e.target.value);
@@ -242,10 +303,10 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
                 }}
                 className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
               />
-              <Button variant="outline" size="sm" onClick={handlePaste} title={t('send.paste')} className="h-10 w-10 p-0">
+              <Button variant="outline" size="sm" onClick={handlePaste} title="Paste" className="h-10 w-10 p-0">
                 <Clipboard className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" disabled title={t('send.scanQR')} className="h-10 w-10 p-0">
+              <Button variant="outline" size="sm" disabled title="Scan QR" className="h-10 w-10 p-0">
                 <QrCode className="h-4 w-4" />
               </Button>
             </div>
@@ -261,7 +322,7 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         {/* Amount */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">
-            {t('send.enterAmount')}
+            Amount
           </Label>
           <div className="flex gap-2">
             <Input
@@ -275,7 +336,7 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
               className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
             />
             <Button variant="outline" onClick={handleMaxClick} className="h-10 px-3">
-              {t('common.max')}
+              Max
             </Button>
           </div>
         </div>
@@ -283,18 +344,18 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         {/* Transaction Details */}
         <div className="space-y-2">
           <h4 className="text-xs font-medium text-muted-foreground">
-            {t('send.transactionDetails')}
+            Transaction Details
           </h4>
           <div className="space-y-1">
             <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
               <span className="text-xs text-muted-foreground">
-                {t('send.estimatedFee')}
+                Network Fee
               </span>
-              <span className="text-xs font-medium">0.000005 SOL</span>
+              <span className="text-xs font-medium text-emerald-400">Gasless (Sponsored)</span>
             </div>
             <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
               <span className="text-xs text-muted-foreground">
-                {t('send.totalAmount')}
+                Total Amount
               </span>
               <span className="text-xs font-medium">
                 {amountNum > 0 ? `${amountNum} ${selectedToken}` : '-'}
@@ -307,10 +368,11 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         <div className="flex gap-2 pt-3 border-t">
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
             className="flex-1 h-10"
+            disabled={isProcessing}
           >
-            {t('common.cancel')}
+            Cancel
           </Button>
           <Button
             onClick={handleSend}
@@ -319,12 +381,12 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
           >
             {isProcessing ? (
               <div className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                <span className="text-sm">{t('send.sending')}</span>
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span className="text-sm">Signing...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-sm">{t('send.confirm')}</span>
+                <span className="text-sm">Confirm Send</span>
                 <ArrowRight className="h-3 w-3" />
               </div>
             )}

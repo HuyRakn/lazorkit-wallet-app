@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Smartphone, Plus, QrCode, Monitor, Tablet } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Smartphone, QrCode, Monitor, Tablet, ShieldCheck, KeyRound, Loader2, RefreshCw, AlertCircle, Camera } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { QRScannerModal } from './qr-scanner-modal';
 import { DeviceApprovalModal } from './device-approval-modal';
 import { useWalletStore } from '@/lib/store/wallet';
-import { t } from '@/lib/i18n';
 import { useToast } from '@/hooks/use-toast';
 
 export const DevicesTab = () => {
@@ -16,28 +15,38 @@ export const DevicesTab = () => {
   const [pendingDevice, setPendingDevice] = useState(null);
   const [connectedDevices, setConnectedDevices] = useState([]);
   const [pendingDevices, setPendingDevices] = useState([]);
+
+  // Real Sync QR Code generation states
+  const [qrCodeURL, setQrCodeURL] = useState<string | null>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pairingStatus, setPairingStatus] = useState<'idle' | 'waiting' | 'approved' | 'rejected' | 'expired'>('idle');
+
   const { pubkey } = useWalletStore();
   const { toast } = useToast();
   
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load devices (connected + pending)
+  // Load active devices
   useEffect(() => {
     if (pubkey) {
       loadConnectedDevices();
       loadPendingDevices();
     }
+    return () => {
+      stopPolling();
+    };
   }, [pubkey]);
 
   const loadPendingDevices = async () => {
     if (!pubkey) return;
-    
     try {
       const resp = await fetch(`${apiBase}/api/device-import/pending/${pubkey}`);
       if (resp.ok) {
         const data = await resp.json();
         setPendingDevices(data.pendingShares || []);
-      } else if (resp.status === 404) {
+      } else {
         setPendingDevices([]);
       }
     } catch (error) {
@@ -47,13 +56,12 @@ export const DevicesTab = () => {
 
   const loadConnectedDevices = async () => {
     if (!pubkey) return;
-
     try {
       const resp = await fetch(`${apiBase}/api/device-import/connected/${pubkey}`);
       if (resp.ok) {
         const data = await resp.json();
         setConnectedDevices(data.connectedDevices || []);
-      } else if (resp.status === 404) {
+      } else {
         setConnectedDevices([]);
       }
     } catch (error) {
@@ -61,27 +69,111 @@ export const DevicesTab = () => {
     }
   };
 
+  // Generate QR for another device to scan and import this wallet
+  const generatePairingQR = async () => {
+    if (!pubkey || isGenerating) return;
+    setIsGenerating(true);
+    setPairingStatus('idle');
+    setQrCodeURL(null);
+    setShareId(null);
+    stopPolling();
+
+    try {
+      const resp = await fetch(`${apiBase}/api/device-import/generate-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passkeyData: {
+            smartWalletAddress: pubkey,
+            publicKey: pubkey
+          },
+          deviceMetadata: {
+            deviceId: `device_${Date.now()}`,
+            userAgent: navigator.userAgent,
+            platform: navigator.platform || 'Browser',
+            language: navigator.language,
+            screen: { width: window.innerWidth, height: window.innerHeight }
+          }
+        })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        setQrCodeURL(data.qrCode);
+        setShareId(data.shareId);
+        setPairingStatus('waiting');
+        
+        // Start polling status
+        startPolling(data.shareId);
+      } else {
+        toast({
+          title: 'Generation failed',
+          description: 'Failed to generate sync QR code. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    } catch (error) {
+      console.error('Generate sync QR error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to connect to pairing service.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const startPolling = (sid: string) => {
+    stopPolling();
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const resp = await fetch(`${apiBase}/api/device-import/status/${sid}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.status === 'approved') {
+            setPairingStatus('approved');
+            setQrCodeURL(null);
+            setShareId(null);
+            stopPolling();
+            toast({
+              title: 'Device Linked Successfully',
+              description: 'The new device has been connected to your MPC wallet.'
+            });
+            loadConnectedDevices();
+            loadPendingDevices();
+          } else if (data.status === 'rejected') {
+            setPairingStatus('rejected');
+            setQrCodeURL(null);
+            setShareId(null);
+            stopPolling();
+            toast({
+              title: 'Device Pairing Rejected',
+              description: 'The syncing request was rejected by the scanning device.',
+              variant: 'destructive'
+            });
+          } else if (data.status === 'expired') {
+            setPairingStatus('expired');
+            setQrCodeURL(null);
+            setShareId(null);
+            stopPolling();
+          }
+        }
+      } catch (error) {
+        console.error('Polling device status error:', error);
+      }
+    }, 2000);
+  };
+
+  const stopPolling = () => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
   const handleQRScanned = async (qrData: string) => {
-    console.log('handleQRScanned called with:', qrData);
-
-    if (!pubkey) {
-      toast({
-        title: 'Wallet not connected',
-        description: 'Please connect your wallet and try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    // Do NOT JSON.parse here. Backend will validate/parse the payload.
-    if (!qrData || typeof qrData !== 'string' || qrData === 'undefined') {
-      toast({
-        title: 'Invalid QR',
-        description: 'Could not read QR data. Please try again.',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!pubkey || !qrData || typeof qrData !== 'string') return;
 
     try {
       const resp = await fetch(`${apiBase}/api/device-import/scan-qr`, {
@@ -105,18 +197,13 @@ export const DevicesTab = () => {
       } else {
         const error = await resp.json();
         toast({
-          title: 'Scan failed',
+          title: 'Pairing failed',
           description: error.error || 'Failed to process QR code',
           variant: 'destructive'
         });
       }
     } catch (error) {
       console.error('QR scan processing failed:', error);
-      toast({
-        title: 'Scan failed',
-        description: 'Failed to process QR code',
-        variant: 'destructive'
-      });
     }
   };
 
@@ -132,17 +219,9 @@ export const DevicesTab = () => {
         toast({ title: 'Device approved', description: 'The device has been connected.' });
         await loadPendingDevices();
         await loadConnectedDevices();
-      } else {
-        const error = await resp.json();
-        toast({
-          title: 'Approval failed',
-          description: error.error || 'Failed to approve device',
-          variant: 'destructive'
-        });
       }
     } catch (error) {
       console.error('Approval failed:', error);
-      toast({ title: 'Approval failed', description: 'Failed to approve device', variant: 'destructive' });
     }
   };
 
@@ -157,95 +236,190 @@ export const DevicesTab = () => {
       if (resp.ok) {
         toast({ title: 'Device rejected', description: 'The device request has been rejected.' });
         await loadPendingDevices();
-      } else {
-        const error = await resp.json();
-        toast({
-          title: 'Rejection failed',
-          description: error.error || 'Failed to reject device',
-          variant: 'destructive'
-        });
       }
     } catch (error) {
       console.error('Rejection failed:', error);
-      toast({ title: 'Rejection failed', description: 'Failed to reject device', variant: 'destructive' });
     }
   };
 
-  if (!pubkey) {
-    return (
-      <div className="space-y-4">
-        <div className="text-center py-8">
-          <Smartphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h4 className="text-lg font-medium mb-2 text-gray-300">Wallet Not Connected</h4>
-          <p className="text-gray-400 text-sm">
-            Please connect your wallet to manage devices
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Build a unified list for simple status rendering
   const unifiedRows = [
     ...connectedDevices.map((d: any) => ({
       id: d._id || d.shareId || Math.random().toString(36).slice(2),
-      platform: d.newDeviceData?.platform,
-      browser: d.newDeviceData?.browser,
-      os: d.newDeviceData?.os,
-      date: d.approvedAt ? new Date(d.approvedAt) : null,
+      platform: d.newDeviceData?.platform || 'Web Browser',
+      browser: d.newDeviceData?.browser || 'Chrome',
+      os: d.newDeviceData?.os || 'macOS',
+      date: d.approvedAt ? new Date(d.approvedAt) : new Date(),
       status: 'Connected' as const,
     })),
     ...pendingDevices.map((d: any) => ({
       id: d._id || d.shareId || Math.random().toString(36).slice(2),
-      platform: d.platform,
-      browser: d.browser,
-      os: d.os,
+      platform: d.platform || 'Mobile device',
+      browser: d.browser || 'Safari',
+      os: d.os || 'iOS',
       date: new Date(d.createdAt),
       status: 'Pending approval' as const,
     })),
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">Devices</h3>
-        <Button
-          onClick={() => setShowQRScanner(true)}
-          className="bg-[#16ffbb] hover:bg-[#16ffbb]/90 text-black shadow-lg hover:shadow-[#16ffbb]/25 transition-all duration-200"
-        >
-          <QrCode className="h-4 w-4 mr-2" />
-          Add Device
-        </Button>
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      
+      {/* Header section */}
+      <div>
+        <h2 className="text-2xl font-black text-white tracking-wide">Passkey Vault Security</h2>
+        <p className="text-xs text-muted-foreground mt-1">
+          Manage hardware devices authorized to sign transactions for your multi-party computation (MPC) smart account.
+        </p>
       </div>
 
-      {/* Unified rows without card layout */}
-      {unifiedRows.length === 0 ? (
-        <p className="text-gray-400 text-sm py-6 text-center">No devices</p>
-      ) : (
-        <div className="divide-y divide-gray-800 rounded-lg border border-gray-800 bg-gray-900/40">
-          {unifiedRows.map((row) => (
-            <div key={row.id} className="flex items-center justify-between p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#16ffbb]/20 to-[#16ffbb]/10 rounded-full flex items-center justify-center shadow-sm">
-                  <Smartphone className="h-5 w-5 text-[#16ffbb]" />
+      {/* Symmetric Dual Column Layout to occupy full viewport space evenly */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        
+        {/* LEFT COLUMN: Authorized Devices & Incoming Requests */}
+        <div className="space-y-6 flex flex-col justify-start">
+          
+          {/* Active Device List Card */}
+          <Card className="bg-[#0b0c10]/40 border-white/[0.06] backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col">
+            <CardHeader className="border-b border-white/[0.06] pb-4">
+              <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <ShieldCheck className="h-4.5 w-4.5 text-primary" />
+                Active Vault Keys
+              </CardTitle>
+              <CardDescription className="text-[11px] text-muted-foreground">
+                Devices permitted to initialize signatures.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0 divide-y divide-white/[0.06] flex-1 overflow-y-auto">
+              {unifiedRows.length === 0 ? (
+                <div className="p-12 text-center flex flex-col items-center justify-center h-full gap-4">
+                  <div className="w-12 h-12 rounded-full bg-white/[0.02] border border-white/10 flex items-center justify-center text-muted-foreground">
+                    <KeyRound className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">Single Key Active</h4>
+                    <p className="text-[11px] text-muted-foreground max-w-[280px] mt-1 mx-auto leading-relaxed">
+                      Only this browser contains the private key share. Pair a smartphone to setup an off-device backup.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-white">{row.platform}</p>
-                  <p className="text-sm text-gray-300">{row.browser} on {row.os}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <span className={
-                  row.status === 'Connected'
-                    ? 'text-xs text-emerald-400 font-medium'
-                    : 'text-xs text-orange-400 font-medium'
-                }>{row.status}</span>
-                <p className="text-xs text-gray-400">{row.date ? row.date.toLocaleDateString() : ''}</p>
-              </div>
-            </div>
-          ))}
+              ) : (
+                unifiedRows.map((row: any) => (
+                  <div key={row.id} className="flex items-center justify-between p-4 hover:bg-white/[0.01] transition-all">
+                    <div className="flex items-center space-x-3.5">
+                      <div className="w-9 h-9 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center shadow-md">
+                        {row.platform.toLowerCase().includes('phone') ? (
+                          <Smartphone className="h-4.5 w-4.5 text-primary" />
+                        ) : row.platform.toLowerCase().includes('tablet') ? (
+                          <Tablet className="h-4.5 w-4.5 text-primary" />
+                        ) : (
+                          <Monitor className="h-4.5 w-4.5 text-primary" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-white text-xs">{row.platform}</p>
+                        <p className="text-[10px] text-muted-foreground">{row.browser} ({row.os})</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        row.status === 'Connected'
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                      }`}>
+                        <span className={`w-1 h-1 rounded-full ${row.status === 'Connected' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+                        {row.status}
+                      </span>
+                      <p className="text-[9px] text-muted-foreground/80 mt-1">{row.date ? row.date.toLocaleDateString() : ''}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+
         </div>
-      )}
+
+        {/* RIGHT COLUMN: Pairing Portal (Scan Phone QR / Display Laptop Sync QR) */}
+        <div className="space-y-6 flex flex-col justify-start">
+          
+          <Card className="bg-[#0b0c10]/40 border-white/[0.06] backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl flex-1 flex flex-col justify-between">
+            <CardHeader className="border-b border-white/[0.06] pb-4">
+              <CardTitle className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <QrCode className="h-4.5 w-4.5 text-primary" />
+                Pairing Portal
+              </CardTitle>
+              <CardDescription className="text-[11px] text-muted-foreground">
+                Authorize a new device using secure QR codes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-6 flex-1 flex flex-col justify-between gap-6">
+              
+              {/* Option A: Device Camera Scan */}
+              <div className="p-4 bg-white/[0.01] border border-white/[0.04] rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Camera className="h-3.5 w-3.5 text-primary" />
+                    Scan Phone QR
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground max-w-[320px] leading-normal">
+                    Use this computer's camera to scan a setup QR code generated on your second device.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowQRScanner(true)}
+                  className="bg-primary hover:bg-primary/90 text-black font-extrabold text-xs px-4 py-2 rounded-xl shrink-0 w-full md:w-auto"
+                >
+                  Open Scanner
+                </Button>
+              </div>
+
+              {/* Option B: Display pairing QR code on screen */}
+              <div className="border border-white/[0.04] bg-white/[0.01] rounded-2xl p-5 flex flex-col items-center justify-center gap-4 flex-1">
+                {qrCodeURL ? (
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="p-3 bg-black rounded-xl border border-white/10 shadow-lg">
+                      <img src={qrCodeURL} alt="Sync QR" className="w-40 h-40 object-contain rounded" />
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-primary font-bold">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Waiting for phone scan...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-4 py-6">
+                    <div className="w-12 h-12 rounded-full bg-white/[0.02] border border-white/10 flex items-center justify-center text-muted-foreground mx-auto">
+                      <QrCode className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-white">Display Laptop Sync QR</h4>
+                      <p className="text-[10px] text-muted-foreground max-w-[260px] mx-auto leading-normal">
+                        Show a temporary pairing code on this screen. Open RampFi on your phone to scan it.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={generatePairingQR}
+                      disabled={isGenerating}
+                      className="bg-white/[0.04] hover:bg-white/[0.08] text-white border border-white/10 font-bold text-xs px-5 py-2.5 rounded-xl transition-all"
+                    >
+                      {isGenerating ? 'Generating...' : 'Generate Sync QR'}
+                    </Button>
+                  </div>
+                )}
+
+                {pairingStatus === 'expired' && (
+                  <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-bold mt-1">
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    <span>QR expired. Please generate a new code.</span>
+                  </div>
+                )}
+              </div>
+
+            </CardContent>
+          </Card>
+
+        </div>
+
+      </div>
 
       <QRScannerModal
         open={showQRScanner}

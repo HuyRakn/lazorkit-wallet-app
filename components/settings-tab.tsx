@@ -23,19 +23,18 @@ import { t } from '@/lib/i18n';
 import { useLanguage } from '@/hooks/use-language';
 import { toast } from '@/hooks/use-toast';
 import { ENV_CONFIG } from '@/lib/config/env';
+import { DevicesTab } from './devices-tab';
 // WalletManager removed per requirement
 
 export const SettingsTab = () => {
-  const { fiat, setFiat, resetDemoData, setHasPasskey, logout, walletName, setWalletName } = useWalletStore();
+  const { fiat, setFiat, setHasPasskey, logout, walletName, setWalletName } = useWalletStore();
 
   const { language, setLanguage } = useLanguage();
   const [passkeyEnabled, setPasskeyEnabled] = useState(true);
-  const [minimalDemo, setMinimalDemo] = useState(false);
   const [pendingName, setPendingName] = useState<string>(walletName || '');
 
   const handleLanguageChange = (newLanguage: string) => {
     setLanguage(newLanguage as 'en' | 'vi');
-    console.log('settings_language_changed', { language: newLanguage });
   };
 
   // Theme functionality removed
@@ -63,13 +62,7 @@ export const SettingsTab = () => {
     }
   };
 
-  const handleResetDemoData = () => {
-    resetDemoData();
-    toast({
-      title: 'Demo data reset',
-      description: 'Demo data has been reset to initial state.',
-    });
-  };
+
 
   return (
     <div className='space-y-6 pb-6'>
@@ -178,10 +171,13 @@ export const SettingsTab = () => {
         </Card>
       </div>
 
-      {/* Security & Backup and Advanced sections removed (mock features) */}
+      {/* Devices Section (Mobile only, since desktop has its own sidebar menu tab) */}
+      <div className='md:hidden space-y-3 pt-2 border-t border-border/30'>
+        <DevicesTab />
+      </div>
 
       {/* Danger Zone */}
-      <div className='space-y-3'>
+      <div className='space-y-3 pt-2 border-t border-border/30'>
         <div className='flex items-center gap-2 px-1'>
           <Trash2 className='h-4 w-4 text-destructive' />
           <h3 className='text-sm font-semibold text-destructive'>Danger Zone</h3>

@@ -34,9 +34,9 @@
   },
   "app": {
     "title": "RampFi",
-    "subtitle": "Mobile-first crypto wallet",
-    "prototype": "Prototype • No real funds • Rates simulated",
-    "demoBadge": "Demo Data • Simulated"
+    "subtitle": "Enterprise Web3 Portal",
+    "prototype": "Solana Devnet • On-Chain",
+    "demoBadge": "Live Data • Solana Devnet"
   },
   "navigation": {
     "buyCoin": "Buy Coin",
@@ -57,7 +57,7 @@
     "enterAmount": "Enter Amount",
     "minAmount": "Min $20",
         "maxAmount": "Max $500",
-    "staticRate": "Static rate in demo",
+    "staticRate": "Live exchange rate",
     "estimatedReceive": "Estimated Receive",
     "paymentMethod": "Payment Method",
     "card": "Card",
@@ -71,8 +71,8 @@
     "insufficientBalance": "Insufficient balance",
     "applePayUnavailable": "Apple Pay not available on this device",
     "trustStripe": "Stripe-secured",
-    "infoBanner": "Rate fixed for demo • Min $20 • Max $500 • No KYC in prototype.",
-    "limits": "Daily limit $500 • Monthly $2,000 (demo)",
+    "infoBanner": "Live exchange rates • Min $20 • Max $500 • VietQR supported.",
+    "limits": "Daily limit $500 • Monthly $2,000",
     "paying": "Paying",
     "receiving": "Receiving",
     "quickAmount": "Quick Amount",
@@ -90,7 +90,7 @@
     }
   },
   "buyPage": {
-    "titleUSDC": "Buy Bitcoin",
+    "titleUSDC": "Buy Crypto",
     "subtitleInstantSecure": "Instantly & Secure",
     "badges": {
       "faceIdLogin": "Face ID Login",
@@ -122,7 +122,7 @@
       "1": "1%",
       "2": "2%"
     },
-    "disclaimer": "This is a simulation"
+    "disclaimer": "Powered by Jupiter API"
   },
   "wallet": {
     "publicKey": "Public Key",
@@ -225,8 +225,8 @@
     "tokens": "Tokens",
     "recentActivity": "Recent Activity",
     "emptyTitle": "No assets yet",
-    "emptySubtitle": "Buy BTC to get started",
-    "buyCta": "Buy BTC",
+    "emptySubtitle": "Buy SOL or USDC to get started",
+    "buyCta": "Buy Crypto",
     "tokensCount": "Tokens: {{count}}",
     "hideZeroShort": "Hide 0",
     "showZeroShort": "Show 0"
@@ -255,16 +255,16 @@
     "currency": "Default Currency",
     "backupSecurity": "Backup & Security",
     "advanced": "Advanced",
-    "demoMode": "Rich Demo Mode",
-    "demoModeHint": "Toggle Minimal Data Mode",
+    "demoMode": "Network Mode",
+    "demoModeHint": "Toggle Devnet/Mainnet",
     "dangerZone": "Danger Zone",
     "passkeyStatus": "Passkey Status",
     "created": "Created",
     "regeneratePasskey": "Regenerate Passkey",
     "exportPublicKey": "Export Public Key",
     "requestTestnetAirdrop": "Request Testnet Airdrop",
-    "resetDemoData": "Reset & Reseed Demo",
-    "confirmReset": "Are you sure you want to reset all demo data? This action cannot be undone.",
+    "resetDemoData": "Reset Wallet Data",
+    "confirmReset": "Are you sure you want to reset all wallet data? This action cannot be undone.",
     "themes": {
       "dark": "Dark",
       "light": "Light"
@@ -291,7 +291,7 @@
       "balancesRefreshed": "Balances refreshed",
       "balancesRefreshedDesc": "Token balances have been updated",
       "refreshFailed": "Refresh failed",
-      "refreshFailedDesc": "Using demo data - RPC connection unavailable",
+      "refreshFailedDesc": "RPC connection unavailable. Retrying...",
       "addressSet": "Address set",
       "addressSetDesc": "Custom address has been set"
     }
@@ -327,11 +327,11 @@
     "addressSetFailedDesc": "Failed to set custom address",
     "enterValidAmount": "Please enter a valid amount",
     "realSwap": "Real Swap",
-    "demoSwap": "Demo Swap",
+    "demoSwap": "Devnet Swap",
     "realSwapConfirmed": "Real Swap confirmed",
     "realSwapFailed": "Swap failed",
     "realSwapFailedDesc": "Failed to execute swap transaction",
-    "demoSwapConfirmed": "Demo Swap confirmed",
+    "demoSwapConfirmed": "Devnet Swap simulated",
     "noPubkeySharing": "No pubkey available for sharing",
     "noPubkeyCopying": "No pubkey available for copying",
     "logoutSuccess": "Logged out",

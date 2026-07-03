@@ -1,7 +1,5 @@
 import type React from 'react';
 import type { Metadata, Viewport } from 'next';
-import { GeistSans } from 'geist/font/sans';
-import { GeistMono } from 'geist/font/mono';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -11,21 +9,27 @@ import { LazorkitRootProvider } from '@/components/lazorkit-provider';
 import { WalletSync } from '@/components/wallet-sync';
 
 export const metadata: Metadata = {
-  title: 'RampFi',
-  description: 'Mobile-first crypto wallet prototype',
-  generator: 'v0.app',
+  title: 'RampFi — Your Gateway to Blockchain',
+  description: 'The easiest way to buy, send, and manage crypto assets on Solana. Gasless transactions powered by LazorKit passkeys.',
+  generator: 'RampFi',
+  keywords: ['crypto', 'solana', 'wallet', 'web3', 'blockchain', 'passkey', 'gasless'],
   icons: {
     icon: '/logo.png',
     shortcut: '/logo.png',
     apple: '/logo.png',
+  },
+  openGraph: {
+    title: 'RampFi — Your Gateway to Blockchain',
+    description: 'Buy, send, and manage crypto assets on Solana with biometric passkeys. No gas fees.',
+    type: 'website',
   },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#0A0B0F',
 };
 
 export default function RootLayout({
@@ -35,8 +39,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='en' suppressHydrationWarning>
+      <head>
+        <link rel='preconnect' href='https://fonts.googleapis.com' />
+        <link rel='preconnect' href='https://fonts.gstatic.com' crossOrigin='anonymous' />
+        <link
+          href='https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap'
+          rel='stylesheet'
+        />
+      </head>
       <body
-        className={`font-sans ${GeistSans.variable} ${GeistMono.variable} antialiased`}
+        className='font-sans antialiased'
       >
         <script
           dangerouslySetInnerHTML={{

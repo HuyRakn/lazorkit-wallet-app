@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ExternalLink, Star, Heart, Shield, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { AppCard as AppCardType } from '@/lib/store/wallet';
@@ -17,14 +18,27 @@ interface AppDetailModalProps {
 // Function to get app image based on app name
 const getAppImage = (appName: string): string => {
   const appImages: { [key: string]: string } = {
-    'Jupiter': 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg',
-    'SolPay Mini': 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg',
-    'RippleChat': 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg',
-    'MintMuse': 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg',
-    'Radiant Swap': 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg',
+    'NFT & cNFT Creator':
+      'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=150&auto=format&fit=crop&q=60',
+    'SolPay Mini':
+      'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=150&auto=format&fit=crop&q=60',
+    'Orbit Dex':
+      'https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=150&auto=format&fit=crop&q=60',
+    'Nova Games':
+      'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=150&auto=format&fit=crop&q=60',
+    'RippleChat':
+      'https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=150&auto=format&fit=crop&q=60',
+    'Keystone Tools':
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=60',
+    'Yield Farm Pro':
+      'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=150&auto=format&fit=crop&q=60',
+    'Solana Social':
+      'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=150&auto=format&fit=crop&q=60',
+    'Crypto Quest':
+      'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=150&auto=format&fit=crop&q=60',
   };
   
-  return appImages[appName] || 'https://pbs.twimg.com/profile_images/1661738815890022410/F8y4vBky_400x400.jpg';
+  return appImages[appName] || 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=150&auto=format&fit=crop&q=60';
 };
 
 export const AppDetailModal = ({
@@ -32,6 +46,8 @@ export const AppDetailModal = ({
   open,
   onOpenChange,
 }: AppDetailModalProps) => {
+  const router = useRouter();
+
   // Prevent body scroll when modal is open
   useEffect(() => {
     if (open) {
@@ -48,7 +64,12 @@ export const AppDetailModal = ({
 
   const handleOpenApp = () => {
     console.log('app_opened', { appId: app.id, appName: app.name });
-    window.open(app.website, '_blank');
+    if (app.website.startsWith('/')) {
+      router.push(app.website);
+      onOpenChange(false);
+    } else {
+      window.open(app.website, '_blank');
+    }
   };
 
   const handleAddToFavorites = () => {

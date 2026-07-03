@@ -17,8 +17,11 @@ export function LazorkitRootProvider({ children }: Props) {
 	}
 
 	return (
-		// @ts-expect-error: SDK typings may differ between versions (ipfsUrl vs portalUrl)
-		<LazorkitProvider rpcUrl={rpcUrl} paymasterUrl={paymasterUrl} ipfsUrl={ipfsUrl} portalUrl={ipfsUrl}>
+		<LazorkitProvider
+			rpcUrl={rpcUrl}
+			portalUrl={ipfsUrl}
+			paymasterConfig={{ paymasterUrl }}
+		>
 			{children}
 		</LazorkitProvider>
 	);

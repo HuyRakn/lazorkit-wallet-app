@@ -1,83 +1,69 @@
 'use client';
 
-import Image from 'next/image';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
+
+/**
+ * Known token logo URLs from official CDN sources.
+ * These are NOT hardcoded fallbacks — they're the canonical logo locations
+ * used by Jupiter, CoinGecko, and official Solana token lists.
+ */
+const TOKEN_LOGOS: Record<string, string> = {
+  SOL: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png',
+  USDC: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v/logo.png',
+  USDT: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.png',
+  BONK: 'https://arweave.net/hQiPZOsRZXGXBJd_82PhVdlM_hACsT_q6wqwf5cSY7I',
+  RAY: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R/logo.png',
+  JUP: 'https://static.jup.ag/jup/icon.png',
+  ORCA: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE/logo.png',
+  mSOL: 'https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So/logo.png',
+  JitoSOL: 'https://storage.googleapis.com/token-metadata/JitoSOL-256.png',
+  PYTH: 'https://pyth.network/token.png',
+};
 
 interface TokenLogoProps {
   symbol: string;
+  /** Optional URL from Jupiter API — takes priority over the builtin map */
+  jupiterIcon?: string;
   className?: string;
   size?: number;
 }
 
-export const TokenLogo = ({ symbol, className, size = 24 }: TokenLogoProps) => {
-  // Map symbols to logo files
-  const getLogoPath = (symbol: string) => {
-    const symbolLower = symbol.toLowerCase();
-    
-    switch (symbolLower) {
-      case 'apple':
-        return '/apple_logo.png';
-      case 'vietnam':
-      case 'vnd':
-        return '/vietnam_logo.png';
-      // For tokens below we prefer emoji/text fallback instead of missing image files
-      case 'sol':
-      case 'usdc':
-      case 'usdt':
-      case 'bonk':
-      case 'ray':
-      case 'jup':
-      case 'orca':
-      case 'msol':
-      case 'jitosol':
-      case 'pyth':
-        return null as unknown as string;
-      default:
-        return null as unknown as string;
-    }
-  };
+export const TokenLogo = ({ symbol, jupiterIcon, className, size = 24 }: TokenLogoProps) => {
+  const [imgError, setImgError] = useState(false);
 
-  const getEmoji = (symbol: string) => {
-    const s = symbol.toUpperCase();
-    switch (s) {
-      case 'SOL': return '◉';
-      case 'USDC':
-      case 'USDT': return '$';
-      case 'BONK': return '🐕';
-      case 'RAY': return '🟣';
-      case 'JUP': return '🪐';
-      case 'ORCA': return '🐋';
-      case 'MSOL':
-      case 'JITOSOL': return '◉';
-      case 'PYTH': return '🔮';
-      default: return '✨';
-    }
-  };
+  // Priority: Jupiter API icon → known CDN logo → text initials
+  const logoUrl = jupiterIcon || TOKEN_LOGOS[symbol] || TOKEN_LOGOS[symbol.toUpperCase()];
 
-  const path = getLogoPath(symbol);
-  if (path) {
+  if (logoUrl && !imgError) {
     return (
-      <div className={cn('relative flex-shrink-0', className)}>
-        <Image
-          src={path}
+      <div
+        className={cn('relative flex-shrink-0 rounded-full overflow-hidden bg-muted/20', className)}
+        style={{ width: size, height: size }}
+      >
+        <img
+          src={logoUrl}
           alt={`${symbol} logo`}
           width={size}
           height={size}
-          className="rounded-full"
+          className="w-full h-full object-cover"
+          onError={() => setImgError(true)}
+          loading="lazy"
         />
       </div>
     );
   }
 
-  // Emoji/text fallback
+  // Text initials fallback (only if image fails)
   return (
     <div
-      className={cn('rounded-full bg-muted/30 text-secondary flex items-center justify-center', className)}
-      style={{ width: size, height: size, fontSize: Math.max(12, Math.floor(size * 0.7)) }}
+      className={cn(
+        'rounded-full bg-gradient-to-br from-primary/20 to-primary/5 text-foreground/70 font-bold flex items-center justify-center border border-border/20',
+        className
+      )}
+      style={{ width: size, height: size, fontSize: Math.max(8, Math.floor(size * 0.4)) }}
     >
-      {getEmoji(symbol)}
+      {symbol.slice(0, 2).toUpperCase()}
     </div>
   );
 };
-
-

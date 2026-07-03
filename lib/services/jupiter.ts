@@ -14,6 +14,7 @@ export interface JupiterToken {
   holderCount?: number;
   isVerified?: boolean;
   tags?: string[];
+  change24hPct?: number;
 }
 
 export interface SwapQuote {
@@ -170,6 +171,7 @@ export async function fetchTokenData(
         holderCount: token.holderCount,
         isVerified: token.isVerified,
         tags: token.tags,
+        change24hPct: token.change24hPct || token.priceChange24h,
       };
 
       // Update cache

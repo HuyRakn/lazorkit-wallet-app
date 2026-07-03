@@ -5,6 +5,7 @@ import { CreditCard, Grid3X3, User, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 import { t } from '@/lib/i18n';
+import { useWalletStore } from '@/lib/store/wallet';
 
 interface DrawerNavProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface DrawerNavProps {
 export const DrawerNav = ({ open, onOpenChange }: DrawerNavProps) => {
   const router = useRouter();
   const pathname = usePathname();
+  const { setActiveSection } = useWalletStore();
 
   const menuItems = [
     {
@@ -34,8 +36,12 @@ export const DrawerNav = ({ open, onOpenChange }: DrawerNavProps) => {
   ];
 
   const handleNavigation = (href: string) => {
-    // Ensure viewport scrolls to top after navigating from deep scroll
-    router.push(href, { scroll: true });
+    if (href === '/buy') {
+      setActiveSection('buy');
+      router.push('/');
+    } else {
+      router.push(href, { scroll: true });
+    }
     onOpenChange(false);
     try {
       const scroller = document.scrollingElement || document.documentElement;

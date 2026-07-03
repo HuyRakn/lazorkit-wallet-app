@@ -1,4 +1,5 @@
 const Order = require('../models/Order');
+const { isConnected } = require('../db');
 
 /**
  * Cron job to mark expired orders as failed
@@ -6,6 +7,10 @@ const Order = require('../models/Order');
  */
 async function markExpiredOrdersAsFailed() {
   try {
+    if (!isConnected()) {
+      console.log('🕐 Cron job skipped: MongoDB is not connected');
+      return;
+    }
     console.log('🕐 Running cron job: Marking expired orders as failed...');
     
     const now = new Date();

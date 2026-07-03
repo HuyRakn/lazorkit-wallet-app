@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Settings2, ChevronDown, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -30,6 +30,7 @@ interface OnRampFormProps {
   tokenData?: Map<string, JupiterToken>;
   onSwitchToSwap?: (params: { fromToken: TokenSym; toToken?: TokenSym }) => void;
   initialFromCurrency?: Fiat;
+  onTokenChange?: (token: string) => void;
 }
 
 interface OnRampData {
@@ -43,27 +44,20 @@ const currencyIcons: Record<Fiat, string> = {
   VND: '₫',
 };
 
-const fallbackTokenIcons: Record<string, string> = {
-  SOL: '◉',
-  USDC: '$',
-  USDT: '$',
-  BONK: '🐕',
-  RAY: '🟣',
-  JUP: '🪐',
-  ORCA: '🐋',
-  mSOL: '◉',
-  JitoSOL: '◉',
-  PYTH: '🔮',
-  XYZ: '✨',
-};
 
-export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCurrency }: OnRampFormProps) => {
+export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCurrency, onTokenChange }: OnRampFormProps) => {
   const { rateUsdToVnd } = useWalletStore();
   const wallet = useWallet() as any;
   const router = useRouter();
   
   const [fromCurrency, setFromCurrency] = useState<Fiat>(initialFromCurrency || 'USD');
   const [toToken, setToToken] = useState<TokenSym>('USDC');
+
+  useEffect(() => {
+    if (onTokenChange) {
+      onTokenChange(toToken);
+    }
+  }, [toToken, onTokenChange]);
   const [amount, setAmount] = useState('');
   const [selectedQuickAmount, setSelectedQuickAmount] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -80,17 +74,15 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
       ? amountNum
       : convertCurrency(amountNum, 'VND', 'USD', 27000);
 
-  // Mock BTC in buy flow (UI-only)
-  const isMockBTC = true;
-  const mockBtcPriceUsd = 110956; // mock BTC price in USD (updated)
   const tokenJupiterData = tokenData?.get(toToken);
-  const tokenPrice = isMockBTC ? mockBtcPriceUsd : (tokenJupiterData?.usdPrice || 1);
+  // Use Jupiter live price data → fallback to known stablecoin prices → zero
+  const tokenPrice = tokenJupiterData?.usdPrice 
+    || (toToken === 'USDC' || toToken === 'USDT' ? 1.0 : 0);
   const estimatedReceive = amountUsd / tokenPrice;
 
   const quickAmounts = [50, 100, 200, 500];
 
   const ICON_OVERRIDES: Partial<Record<TokenSym, string>> = {
-    // Use CoinGecko CDN (allows hotlinking) to avoid 403 from cryptologos
     USDC: 'https://assets.coingecko.com/coins/images/6319/standard/USD_Coin_icon.png',
     USDT: 'https://assets.coingecko.com/coins/images/325/standard/Tether.png',
     SOL: 'https://assets.coingecko.com/coins/images/4128/standard/solana.png',
@@ -102,14 +94,6 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   };
 
   const getTokenIcon = (symbol: string) => {
-    // Override icon with bitcoin logo when mocking BTC
-    if (isMockBTC && symbol === toToken) {
-      return (
-        <div className='relative w-5 h-5'>
-          <img src='/bitcoin-btc-logo.png' alt='BTC' className='absolute inset-0 w-full h-full rounded-full object-cover' />
-        </div>
-      );
-    }
     const token = tokenData?.get(symbol);
     const override = ICON_OVERRIDES[symbol as TokenSym];
     return (
@@ -292,7 +276,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm'>{isMockBTC ? 'BTC' : toToken}</span>
+                  <span className='font-medium text-sm'>{toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -300,7 +284,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
               <div className='flex-1 ml-3 text-right'>
                 <div className='mb-1'>
                   <span className='text-xs text-muted-foreground'>
-                    {t('common.price')}: 1 {isMockBTC ? 'BTC' : toToken} = ${tokenPrice?.toFixed(2) || '1.00'}
+                    {t('common.price')}: 1 {toToken} = ${tokenPrice?.toFixed(2) || '1.00'}
                   </span>
                 </div>
                 <div className='text-2xl font-semibold text-muted-foreground/50'>
@@ -542,13 +526,13 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             </div>
 
             <div className='p-3 space-y-1.5'>
-              {(['USDC'] as TokenSym[]).map((token, index) => {
+              {(['USDC', 'SOL', 'USDT'] as TokenSym[]).map((token, index) => {
                 const jupiterToken = tokenData?.get(token);
+                const override = ICON_OVERRIDES[token];
                 return (
                   <button
                     key={token}
                     onClick={() => {
-                      // keep state but mock UI as BTC
                       setToToken(token);
                       setShowTokenSelect(false);
                     }}
@@ -562,10 +546,28 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
                       token === toToken ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
                     }`}>
-                      <img src='/bitcoin-btc-logo.png' alt='BTC' className='absolute inset-0 w-full h-full object-cover' />
+                      <TokenLogo symbol={token} size={24} />
+                      {(jupiterToken?.icon || override) && (
+                        <img
+                          src={(jupiterToken?.icon as string) || override!}
+                          alt={token}
+                          className='absolute inset-0 w-full h-full rounded-full object-cover'
+                          data-fallback={ICON_FALLBACK_2[token] || ''}
+                          onError={(e) => {
+                            const img = e.currentTarget as HTMLImageElement;
+                            const next = img.getAttribute('data-fallback');
+                            if (next) {
+                              img.setAttribute('data-fallback', '');
+                              img.src = next;
+                            } else {
+                              img.style.display = 'none';
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                     <div className='flex-1 text-left'>
-                      <div className='font-semibold text-sm'>BTC</div>
+                      <div className='font-semibold text-sm'>{token}</div>
                       {(
                         jupiterToken?.id ||
                         (TOKEN_ADDRESSES as Record<string, string>)[token]

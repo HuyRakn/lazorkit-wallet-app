@@ -7,27 +7,8 @@ const bs58 = require('bs58');
 let BN;
 try { BN = require('bn.js'); } catch (_) { BN = null; }
 
-// Import SDK package - prefer backend server API when available
-let LazorkitWalletBackend = null;
-const backendCandidates = [
-  '@lazorkit/wallet/backend',
-  '@lazorkit/wallet/server',
-  '@lazorkit/wallet/dist/backend',
-  '@lazorkit/wallet/dist/server',
-];
-for (const mod of backendCandidates) {
-  if (LazorkitWalletBackend) break;
-  try {
-    const loaded = require(mod);
-    if (loaded) {
-      LazorkitWalletBackend = loaded;
-    }
-  } catch (_) {
-    // ignore; try next candidate
-  }
-}
-
-const LazorkitWallet = LazorkitWalletBackend || require('@lazorkit/wallet');
+// Import SDK package directly from the root
+const LazorkitWallet = require('@lazorkit/wallet');
 
 const fiveMinutesMs = 5 * 60 * 1000;
 
@@ -136,6 +117,56 @@ function compressP256ToBase64(xBn, yBn) {
   }
 }
 
+// Helper: standard-compress any public key format to correct 33-byte compressed SECP256R1 key
+function normalizePublicKey(key) {
+  if (!key) return key;
+  let buf;
+  if (typeof key === 'string') {
+    if (/^[A-Za-z0-9+/]*={0,2}$/.test(key)) {
+      buf = Buffer.from(key, 'base64');
+    } else {
+      buf = Buffer.from(key, 'hex');
+    }
+  } else if (Array.isArray(key) || key instanceof Uint8Array) {
+    buf = Buffer.from(key);
+  } else {
+    return key;
+  }
+
+  // standard compressed: 33 bytes, starts with 0x02 or 0x03
+  if (buf.length === 33 && (buf[0] === 2 || buf[0] === 3)) {
+    return buf;
+  }
+
+  // naive compressed: X || Y[0]
+  if (buf.length === 33) {
+    const x = buf.subarray(0, 32);
+    const y0 = buf[32];
+    const prefix = (y0 % 2 === 0) ? 2 : 3;
+    return Buffer.concat([Buffer.from([prefix]), x]);
+  }
+
+  // raw uncompressed: 64 bytes (X || Y)
+  if (buf.length === 64) {
+    const x = buf.subarray(0, 32);
+    const y = buf.subarray(32, 64);
+    const yIsEven = (y[31] % 2 === 0);
+    const prefix = yIsEven ? 2 : 3;
+    return Buffer.concat([Buffer.from([prefix]), x]);
+  }
+
+  // SPKI uncompressed: 65 bytes (0x04 || X || Y)
+  if (buf.length === 65 && buf[0] === 4) {
+    const x = buf.subarray(1, 33);
+    const y = buf.subarray(33, 65);
+    const yIsEven = (y[31] % 2 === 0);
+    const prefix = yIsEven ? 2 : 3;
+    return Buffer.concat([Buffer.from([prefix]), x]);
+  }
+
+  return buf;
+}
+
 // Normalize passkey data for SDK backend
 // CRITICAL: Backend SDK expects publicKey.x/y as Uint8Array
 function normalizePasskeyData(raw) {
@@ -145,11 +176,19 @@ function normalizePasskeyData(raw) {
     credentialId: typeof raw.credentialId,
     userId: typeof raw.userId,
     hasPublicKey: !!raw.publicKey,
+    hasPasskeyPubkey: !!raw.passkeyPubkey,
     publicKeyX: raw.publicKey?.x ? (raw.publicKey.x.constructor?.name || typeof raw.publicKey.x) : 'missing',
     publicKeyY: raw.publicKey?.y ? (raw.publicKey.y.constructor?.name || typeof raw.publicKey.y) : 'missing'
   });
   
   const out = { ...raw };
+  
+  // Convert and normalize passkeyPubkey
+  const targetKey = raw.passkeyPubkey || raw.passkeyPublicKey || raw.publicKeyBase64;
+  if (targetKey && (typeof targetKey === 'string' || Array.isArray(targetKey) || targetKey instanceof Uint8Array)) {
+    const normBuf = normalizePublicKey(targetKey);
+    out.passkeyPublicKey = normBuf.toString('base64');
+  }
   
   // credentialId and userId can be base64url strings
   if (out.credentialId && typeof out.credentialId !== 'string') {
@@ -158,6 +197,7 @@ function normalizePasskeyData(raw) {
   if (out.userId && typeof out.userId !== 'string') {
     out.userId = toBase64Url(out.userId);
   }
+
 
   // CRITICAL: publicKey.x and publicKey.y MUST be Uint8Array
   if (out.publicKey && typeof out.publicKey === 'object') {
@@ -177,13 +217,29 @@ function normalizePasskeyData(raw) {
     }
     
     out.publicKey = pk;
+
+    // Overwrite/guarantee passkeyPublicKey using coordinates if both are present
+    if (pk.x && pk.y) {
+      try {
+        const xBytes = toUint8Array(pk.x);
+        const yBytes = toUint8Array(pk.y);
+        const compressedB64 = compressP256ToBase64(xBytes, yBytes);
+        if (compressedB64) {
+          out.passkeyPublicKey = compressedB64;
+          console.log('✅ Override passkeyPublicKey with compressed x/y:', compressedB64);
+        }
+      } catch (err) {
+        console.warn('Failed to compress from x/y coordinates:', err);
+      }
+    }
   }
+
   
   console.log('✅ Normalized passkey data:', {
     credentialId: out.credentialId?.slice(0, 10) + '...',
+    hasPasskeyPublicKey: !!out.passkeyPublicKey,
     publicKeyXType: out.publicKey?.x?.constructor?.name,
     publicKeyYType: out.publicKey?.y?.constructor?.name,
-    // Length logs only for byte-like; BN does not expose length, skip
   });
   
   return out;
@@ -207,149 +263,23 @@ router.post('/', async (req, res, next) => {
     const returnSuccess = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/success?status=success&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(total)}&subtotal=${encodeURIComponent(subtotal)}`;
     const returnFailed = `${process.env.APP_BASE_URL || 'https://localhost:3000'}/callback/failed?status=failed&ref=${encodeURIComponent(reference)}&token=${encodeURIComponent(token || '')}&currency=${encodeURIComponent(currency)}&amount=${encodeURIComponent(total)}&subtotal=${encodeURIComponent(subtotal)}`;
 
-    const providerUrl = process.env.WHATEE_API_URL || 'https://onecheckout.sandbox.whatee.io/api/v1.0/orders';
-    const providerKey = process.env.WHATEE_API_KEY || '';
-    const merchantId = process.env.WHATEE_MERCHANT_ID || '';
-
-    const body = {
-      merchantId,
-      amount: Number(Number(amount).toFixed(2)), // This is the subtotal amount
-      currency,
-      reference,
-      description: `Buy ${token || ''} via LazorKit`,
-      metadata: Object.entries({ ...(metadata || {}), token: token || '' }).map(([key, value]) => ({ key, value: String(value) })),
-      payment: { 
-        provider: 'stripe', 
-        method: 'card', 
-        flow: 'direct', 
-        success_url: returnSuccess, 
-        cancel_url: returnFailed, 
-        successUrl: returnSuccess, 
-        cancelUrl: returnFailed, 
-        return_url: returnSuccess, 
-        returnUrl: returnSuccess, 
-        redirect_url: returnSuccess 
-      },
-      redirectUrls: { success: returnSuccess, cancel: returnFailed },
-      success_url: returnSuccess,
-      cancel_url: returnFailed,
-      successUrl: returnSuccess,
-      cancelUrl: returnFailed,
-      return_url: returnSuccess,
-      returnUrl: returnSuccess,
-      redirect_url: returnSuccess,
-      callback_url: `${process.env.APP_BASE_URL || 'https://localhost:3000'}/api/orders/callback/success`,
-    };
-
-    if (Array.isArray(orderLines) && orderLines.length > 0) {
-      body.order_lines = orderLines.map((l) => ({
-        key: String(l.key || 'item'),
-        title: String(l.title || `Buy ${token || 'Token'}`),
-        quantity: Number(l.quantity || 1),
-        unit_price: Number(l.unit_price ?? subtotal),
-        amount: Number(l.amount ?? subtotal),
-      }));
-    } else {
-      body.order_lines = [
-        { key: 'onramp', title: `Buy ${token || ''}`, quantity: 1, unit_price: subtotal, amount: subtotal },
-        { key: 'fee', title: 'Processing Fee', quantity: 1, unit_price: fee, amount: fee },
-        { key: 'network', title: 'Network Fee', quantity: 1, unit_price: networkFee, amount: networkFee },
-      ];
-    }
-
-    // Update the total amount for payment
-    body.amount = total;
-
-    const payload = { ...body };
-    console.log('[orders.create] Creating order with reference:', reference);
-
-    const resp = await fetch(providerUrl, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Accept': 'application/json', 
-        Authorization: `Bearer ${providerKey}` 
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      let text = '';
-      try { text = await resp.text(); } catch {}
-      const plain = text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-      const short = plain.slice(0, 300);
-      return res.status(resp.status).json({ error: 'Provider error', details: short });
-    }
-
-    const data = await resp.json();
-    let checkoutUrl =
-      data?.checkoutUrl ||
-      data?.checkout_url ||
-      data?.payment?.url ||
-      data?.payment?.checkoutUrl ||
-      data?.payment?.checkout_url ||
-      data?.payment?.session?.url ||
-      data?.payment?.session_url ||
-      data?.payment?.stripe?.url ||
-      data?.payment?.stripe?.checkoutUrl ||
-      data?.payment?.stripe?.checkout_url ||
-      data?.data?.checkoutUrl ||
-      data?.data?.checkout_url ||
-      data?.data?.payment?.url ||
-      data?.data?.payment?.session?.url ||
-      data?.links?.checkout ||
-      data?.links?.payment ||
-      data?.links?.redirect ||
-      data?.hosted_url ||
-      data?.hosted?.url ||
-      data?.url || '';
-
-    if (!checkoutUrl) {
-      const preferFromArray = (arr) => {
-        if (!Array.isArray(arr)) return undefined;
-        const urls = arr.filter((v) => typeof v === 'string' && String(v).startsWith('http'));
-        const notThank = urls.filter((u) => !/thank|receipt|success/i.test(u));
-        const prioritized = notThank.filter((u) => /checkout|session|hosted|pay|stripe|onecheckout|whatee/i.test(u));
-        return prioritized[1] || prioritized[2] || prioritized[0] || urls[1] || urls[2] || urls[0];
-      };
-      checkoutUrl =
-        preferFromArray(data?.urls) ||
-        preferFromArray(data?.links) ||
-        preferFromArray(data?.payment?.urls) ||
-        preferFromArray(data?.data?.urls) ||
-        '';
-
-      if (!checkoutUrl) {
-        const candidates = [];
-        const walk = (obj) => {
-          if (!obj) return;
-          if (typeof obj === 'string') {
-            if (obj.startsWith('http')) candidates.push(obj);
-            return;
-          }
-          if (Array.isArray(obj)) { obj.forEach(walk); return; }
-          if (typeof obj === 'object') { Object.values(obj).forEach(walk); }
-        };
-        walk(data);
-        const filtered = candidates.filter((u) => /stripe|checkout|session|hosted|pay|whatee|onecheckout/i.test(u) && !/thank|receipt|success/i.test(u));
-        checkoutUrl = filtered[1] || filtered[2] || filtered[0] || candidates[1] || candidates[2] || candidates[0] || '';
-      }
-    }
+    // Create a mock local checkout URL pointing to our frontend mock checkout page
+    const checkoutUrl = `/onramp-checkout?ref=${reference}`;
 
     // Save order to DB with passkeyData
     const order = await Order.create({
       reference,
-      provider: 'stripe',
+      provider: 'mock',
       amount: Number(amount),
       currency,
       token,
       status: 'pending',
       checkoutUrl,
       passkeyData: passkeyData || undefined,
-      expiresAt: new Date(Date.now() + fiveMinutesMs),
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes expiration
     });
 
-    console.log('[orders.create] Order saved to DB:', {
+    console.log('[orders.create] Order saved to DB (Mock Sandbox):', {
       reference: order.reference,
       hasPasskeyData: !!order.passkeyData,
       smartWalletAddress: order.passkeyData?.smartWalletAddress
@@ -415,16 +345,29 @@ router.post('/callback/success', async (req, res, next) => {
         // Build parameters required by LazorKit backend SDK
         // Expecting these fields persisted from FE passkey registration
         // Use existing walletId if present, else generate a new one (as decimal string)
-        let smartWalletIdRaw = order.passkeyData?.smartWalletId || order.passkeyData?.walletId || order.passkeyData?.smartWalletID;
+        let smartWalletIdRaw = passkeyDataToUse?.smartWalletId || passkeyDataToUse?.walletId || passkeyDataToUse?.smartWalletID;
         // credentialId may be base64url; normalize to standard base64
-        const credentialIdBase64 = fromBase64Url(order.passkeyData?.credentialId || order.passkeyData?.credentialID);
+        const credentialIdBase64 = fromBase64Url(passkeyDataToUse?.credentialId || passkeyDataToUse?.credentialID);
         // passkeyPublicKey may be provided directly or derivable from x/y
-        let passkeyPublicKeyBase64 = order.passkeyData?.passkeyPublicKey || order.passkeyData?.publicKeyBase64 || order.passkeyData?.publicKey;
-        if (!passkeyPublicKeyBase64 && order.passkeyData?.publicKey?.x && order.passkeyData?.publicKey?.y) {
+        let passkeyPublicKeyBase64 = passkeyDataToUse?.passkeyPublicKey || passkeyDataToUse?.publicKeyBase64 || passkeyDataToUse?.publicKey;
+        if (!passkeyPublicKeyBase64 && passkeyDataToUse?.publicKey?.x && passkeyDataToUse?.publicKey?.y) {
           // Use normalized BN values from earlier normalizePasskeyData
-          const xBn = order.passkeyData.publicKey.x;
-          const yBn = order.passkeyData.publicKey.y;
+          const xBn = passkeyDataToUse.publicKey.x;
+          const yBn = passkeyDataToUse.publicKey.y;
           passkeyPublicKeyBase64 = compressP256ToBase64(xBn, yBn);
+        }
+
+        // Instantiate LazorkitClient directly from the root package
+        const client = new LazorkitWallet.LazorkitClient(connection);
+
+        // If no walletId yet, generate via client internals (8 bytes random) BEFORE checking
+        if (!smartWalletIdRaw && typeof client?.generateWalletId === 'function') {
+          try {
+            const bn = client.generateWalletId();
+            smartWalletIdRaw = bn.toString();
+          } catch (err) {
+            console.error('[callback/success] Failed to generate smart wallet ID:', err);
+          }
         }
 
         console.log('[callback/success] Passkey fields prepared:', {
@@ -437,35 +380,15 @@ router.post('/callback/success', async (req, res, next) => {
           throw new Error('Missing required passkey fields (smartWalletId, credentialId, passkeyPublicKey)');
         }
 
-        // Instantiate SDK and create the wallet transaction with default policy
-        let result;
-        const LazorKitCls = LazorkitWallet?.LazorKit || LazorkitWallet?.default?.LazorKit;
-        if (typeof LazorKitCls !== 'function') {
-          throw new Error('LazorKit class not available from @lazorkit/wallet');
-        }
-
-        const sdk = new LazorKitCls(connection);
-        // If no walletId yet, generate via client internals (8 bytes random)
-        if (!smartWalletIdRaw && typeof sdk?.getLazorkitClient === 'function') {
-          try {
-            const client = sdk.getLazorkitClient();
-            const bn = client.generateWalletId();
-            smartWalletIdRaw = bn.toString();
-          } catch {}
-        }
-
-        // If walletId is a hex-like string, convert to BN base16 to avoid BN parsing base10 by default
+        // If walletId is a hex-like string starting with 0x, convert to BN base16
         let walletIdParam = smartWalletIdRaw;
-        if (typeof smartWalletIdRaw === 'string' && /^(0x)?[0-9a-f]+$/i.test(smartWalletIdRaw)) {
+        if (typeof smartWalletIdRaw === 'string' && smartWalletIdRaw.startsWith('0x')) {
           try {
-            const hex = smartWalletIdRaw.startsWith('0x') ? smartWalletIdRaw.slice(2) : smartWalletIdRaw;
+            const hex = smartWalletIdRaw.slice(2);
             walletIdParam = BN ? new BN(hex, 16) : hex; // BN preferred if available
           } catch {}
         }
 
-        // Build transaction with non-zero amount to fund policy init rent
-        const client = typeof sdk.getLazorkitClient === 'function' ? sdk.getLazorkitClient() : null;
-        if (!client) throw new Error('LazorKit client unavailable');
         let initLamportsNum = Number(process.env.SMART_WALLET_INIT_LAMPORTS);
         if (!Number.isFinite(initLamportsNum) || initLamportsNum <= 0) {
           initLamportsNum = 5_000_000; // fallback ~0.005 SOL to cover InitPolicy rent
@@ -485,13 +408,14 @@ router.post('/callback/success', async (req, res, next) => {
           console.log('[callback/success] Expected smart wallet PDA:', expectedPda?.toBase58?.() || String(expectedPda));
         } catch (_) {}
 
+        let result;
         const txnOut = await client.createSmartWalletTxn({
           payer: adminKeypair.publicKey,
           passkeyPublicKey: pkBytes,
           credentialIdBase64,
           smartWalletId: walletIdBn,
           amount: initLamports,
-        }, { useVersionedTransaction: false });
+        });
 
         result = { transaction: txnOut.transaction, smartWallet: (expectedPda?.toBase58?.() || txnOut.smartWallet?.toBase58?.() || txnOut.smartWallet), smartWalletId: walletIdBn };
 
@@ -564,15 +488,11 @@ router.post('/callback/success', async (req, res, next) => {
         const candidates = [];
         if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
         try {
-          const byCred = await client.getSmartWalletByCredentialId(credentialIdBase64);
+          const credentialHash = LazorkitWallet.credentialHashFromBase64(credentialIdBase64);
+          const byCred = await client.getSmartWalletByCredentialHash(credentialHash);
           const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
           if (p) candidates.push(p);
-        } catch (e) { console.warn('[callback/success] getSmartWalletByCredentialId failed:', e?.message || e); }
-        try {
-          const byPk = await client.getSmartWalletByPasskey(Buffer.from(passkeyPublicKeyBase64, 'base64'));
-          const p = byPk?.smartWallet?.toBase58?.() || byPk?.smartWallet || null;
-          if (p) candidates.push(p);
-        } catch (e) { console.warn('[callback/success] getSmartWalletByPasskey failed:', e?.message || e); }
+        } catch (e) { console.warn('[callback/success] getSmartWalletByCredentialHash failed:', e?.message || e); }
 
         let picked = null;
         for (const addr of candidates) {
@@ -702,6 +622,9 @@ router.get('/:reference', async (req, res, next) => {
       reference: order.reference,
       status: order.status,
       walletAddress: order.walletAddress || order?.passkeyData?.smartWalletAddress || null,
+      amount: order.amount,
+      currency: order.currency,
+      token: order.token,
     });
   } catch (err) { return next(err); }
 });
@@ -815,13 +738,7 @@ router.post('/create-smart-wallet', async (req, res, next) => {
 
     let smartWalletIdRaw = normalized?.smartWalletId || normalized?.walletId || normalized?.smartWalletID;
 
-    const LazorKitCls = LazorkitWallet?.LazorKit || LazorkitWallet?.default?.LazorKit;
-    if (typeof LazorKitCls !== 'function') {
-      return res.status(500).json({ error: 'LazorKit class not available from @lazorkit/wallet' });
-    }
-    const sdk = new LazorKitCls(connection);
-    const client = typeof sdk.getLazorkitClient === 'function' ? sdk.getLazorkitClient() : null;
-    if (!client) return res.status(500).json({ error: 'LazorKit client unavailable' });
+    const client = new LazorkitWallet.LazorkitClient(connection);
 
     // Generate walletId if missing
     if (!smartWalletIdRaw && typeof client.generateWalletId === 'function') {
@@ -835,11 +752,11 @@ router.post('/create-smart-wallet', async (req, res, next) => {
       return res.status(400).json({ error: 'Missing required passkey fields (smartWalletId, credentialId, passkeyPublicKey)' });
     }
 
-    // Prepare params
+    // Prepare params: convert hex string starting with 0x to base16 BN
     let walletIdParam = smartWalletIdRaw;
-    if (typeof smartWalletIdRaw === 'string' && /^(0x)?[0-9a-f]+$/i.test(smartWalletIdRaw)) {
+    if (typeof smartWalletIdRaw === 'string' && smartWalletIdRaw.startsWith('0x')) {
       try {
-        const hex = smartWalletIdRaw.startsWith('0x') ? smartWalletIdRaw.slice(2) : smartWalletIdRaw;
+        const hex = smartWalletIdRaw.slice(2);
         walletIdParam = BN ? new BN(hex, 16) : hex;
       } catch {}
     }
@@ -859,7 +776,7 @@ router.post('/create-smart-wallet', async (req, res, next) => {
       credentialIdBase64,
       smartWalletId: walletIdBn,
       amount: initLamports,
-    }, { useVersionedTransaction: false });
+    });
 
     // Sign and send
     const transaction = txnOut.transaction || txnOut.tx;
@@ -896,13 +813,9 @@ router.post('/create-smart-wallet', async (req, res, next) => {
     const candidates = [];
     if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
     try {
-      const byCred = await client.getSmartWalletByCredentialId(credentialIdBase64);
+      const credentialHash = LazorkitWallet.credentialHashFromBase64(credentialIdBase64);
+      const byCred = await client.getSmartWalletByCredentialHash(credentialHash);
       const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
-      if (p) candidates.push(p);
-    } catch {}
-    try {
-      const byPk = await client.getSmartWalletByPasskey(Buffer.from(passkeyPublicKeyBase64, 'base64'));
-      const p = byPk?.smartWallet?.toBase58?.() || byPk?.smartWallet || null;
       if (p) candidates.push(p);
     } catch {}
 

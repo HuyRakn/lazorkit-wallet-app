@@ -1,6 +1,5 @@
-// Environment configuration for testing
+// Environment configuration
 export const ENV_CONFIG = {
-  // Set to true to enable demo mode (mock data + wallet functionality)
-  // Set to false for new user experience (no mock data, no wallet)
-  ENABLE_DEMO: process.env.NEXT_PUBLIC_ENABLE_DEMO === 'true',
+  // RampFi runs in on-chain mode only (Solana Devnet)
+  // Demo mode has been removed — all data comes from on-chain or APIs
 } as const;

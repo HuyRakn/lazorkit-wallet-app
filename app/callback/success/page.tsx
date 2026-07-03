@@ -56,7 +56,7 @@ async function fetchOrderWallet(reference: string): Promise<{ walletAddress?: st
 export default function SuccessCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { hasWallet, setHasWallet, setPubkey, onrampFake, setTokenAmount, refreshBalances } = useWalletStore() as any;
+  const { hasWallet, setHasWallet, setPubkey, recordOnrampPurchase, setTokenAmount, refreshBalances } = useWalletStore() as any;
   const [resolvedWallet, setResolvedWallet] = useState<string | null>(null);
   const [isLoadingWallet, setIsLoadingWallet] = useState<boolean>(true);
   const [txSignature, setTxSignature] = useState<string | null>(null);
@@ -66,18 +66,16 @@ export default function SuccessCallbackPage() {
   const subtotalFromUrl = parseFloat(searchParams.get('subtotal') || '0');
   // Use subtotal from URL if available, otherwise calculate it (total - $1 fixed fee)
   const amount = subtotalFromUrl > 0 ? subtotalFromUrl : Math.max(0, totalAmount - 1.00);
-  const btcPriceUsd = 110956; // keep in sync with buy UI mock
-  const btcAmountComputed = amount > 0 ? amount / btcPriceUsd : 0;
-  const token = ('BTC' as any) as 'SOL' | 'USDC' | 'USDT' | null; // mock display as BTC
+  const token = (searchParams.get('token') as 'SOL' | 'USDC' | 'USDT') || 'USDC';
   const currencyParam = (searchParams.get('currency') as 'USD' | 'VND' | null) || (searchParams.get('currency_code') as 'USD' | 'VND' | null);
   const currency: 'USD' | 'VND' = currencyParam || 'USD';
   const status = searchParams.get('status');
 
   useEffect(() => {
     if (orderId && amount && token && currency) {
-      onrampFake(amount, currency, token, orderId); // Use subtotal for token balance
+      recordOnrampPurchase(amount, currency, token, orderId);
     }
-  }, [orderId, amount, token, currency, onrampFake]);
+  }, [orderId, amount, token, currency, recordOnrampPurchase]);
 
   useEffect(() => {
     if (status === 'success' && orderId) {
@@ -203,9 +201,8 @@ export default function SuccessCallbackPage() {
                 <div className="flex justify-between items-center py-3 border-b border-[#1e1e2e]">
                   <span className="text-sm text-gray-400">Token</span>
                   <div className="flex items-center gap-2">
-                    <img src="/bitcoin-btc-logo.png" alt="BTC" className="w-5 h-5 rounded-full" />
-                    <span className="text-base font-medium text-white">{btcAmountComputed.toFixed(8)}</span>
-                    <span className="text-sm text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">BTC</span>
+                    <span className="text-base font-medium text-white">{amount.toFixed(2)}</span>
+                    <span className="text-sm text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded">{token}</span>
                   </div>
                 </div>
               )}

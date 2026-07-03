@@ -12,7 +12,7 @@ export interface RealTokenData {
 }
 
 // Cache for real token data
-const tokenDataCache = new Map<string, RealTokenData>();
+const tokenDataCache = new Map<string, any>();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
 const lastFetchTime = new Map<string, number>();
 
@@ -28,7 +28,7 @@ export async function fetchRealTokenData(
     if (Date.now() - lastFetch < CACHE_DURATION && tokenDataCache.has(cacheKey)) {
       const cached = tokenDataCache.get(cacheKey);
       if (cached) {
-        return [cached];
+        return cached;
       }
     }
 
@@ -98,7 +98,7 @@ export async function fetchRealTokenData(
     }
     
     // Update cache
-    tokenDataCache.set(cacheKey, tokens[0]); // Store first token as representative
+    tokenDataCache.set(cacheKey, tokens); // Store all tokens
     lastFetchTime.set(cacheKey, Date.now());
     
     return tokens;

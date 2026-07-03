@@ -52,18 +52,24 @@ app.use(express.urlencoded({ extended: true }));
 // Trust proxy for accurate IP addresses
 app.set('trust proxy', true);
 
-// Routes
 const ordersRouter = require('./src/routes/orders');
 const jupiterRouter = require('./src/routes/jupiter');
 const deviceImportRouter = require('./src/routes/device-import');
+const nftMetadataRouter = require('./src/routes/nft-metadata');
+const postsRouter = require('./src/routes/posts');
+const newsRouter = require('./src/routes/news');
+
 app.use('/api/orders', ordersRouter);
 app.use('/api/jupiter', jupiterRouter);
 app.use('/api/device-import', deviceImportRouter);
+app.use('/api/nft-metadata', nftMetadataRouter);
+app.use('/api/posts', postsRouter);
+app.use('/api/news', newsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -97,7 +103,7 @@ const startServer = async () => {
   }
 
   const isProduction = process.env.NODE_ENV === 'production';
-  
+
   if (isProduction) {
     // Production: Use HTTP (Render handles HTTPS termination)
     app.listen(PORT, '0.0.0.0', () => {

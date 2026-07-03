@@ -3,6 +3,16 @@ import { AppCard } from './types';
 // Sample app data
 export const sampleApps: AppCard[] = [
   {
+    id: 'nft-creator',
+    name: 'NFT & cNFT Creator',
+    intro: 'Mint gasless NFTs and Compressed NFTs on Solana Devnet',
+    category: 'Tools',
+    tags: ['NFT', 'cNFT', 'Gasless'],
+    image: '/placeholder.svg',
+    website: '/apps/nft-creator',
+    verified: true,
+  },
+  {
     id: '1',
     name: 'SolPay Mini',
     intro: 'Fast and secure payments on Solana',

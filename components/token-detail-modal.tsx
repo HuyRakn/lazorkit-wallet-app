@@ -2,6 +2,7 @@
 
 import { TrendingUp, TrendingDown, Send, Plus } from 'lucide-react';
 import { Button } from './ui/button';
+import { TokenLogo } from './ui/token-logo';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Card, CardContent } from './ui/card';
 import { CopyButton } from './ui/copy-button';
@@ -37,10 +38,8 @@ export const TokenDetailModal = ({
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
           <DialogTitle className='flex items-center space-x-3'>
-            <div className='w-10 h-10 bg-muted rounded-full flex items-center justify-center'>
-              <span className='text-sm font-semibold'>
-                {token.symbol.slice(0, 2)}
-              </span>
+            <div className='w-10 h-10 rounded-full overflow-hidden flex items-center justify-center bg-muted'>
+              <TokenLogo symbol={token.symbol} size={40} />
             </div>
             <div>
               <div className='font-semibold'>{token.symbol}</div>
@@ -81,7 +80,7 @@ export const TokenDetailModal = ({
 
             <div className='flex justify-between items-center'>
               <span className='text-muted-foreground'>{t('token.marketCap')}</span>
-              <span className='font-semibold'>$2.1B</span>
+              <span className='font-semibold'>—</span>
             </div>
 
             <div className='flex justify-between items-center'>
@@ -92,7 +91,7 @@ export const TokenDetailModal = ({
             {/* Sparkline */}
             <div className='pt-2'>
               <Sparkline data={spark} />
-              <div className='text-[10px] text-muted-foreground mt-1 text-right'>7d trend (demo)</div>
+              <div className='text-[10px] text-muted-foreground mt-1 text-right'>7d trend (Devnet)</div>
             </div>
           </div>
 
