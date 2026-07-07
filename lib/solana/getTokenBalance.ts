@@ -2,6 +2,7 @@
 export async function getSplTokenBalance(owner: string, mint: string, rpcUrl?: string): Promise<{ amount: number; decimals: number } | null> {
   try {
     const { Connection, PublicKey } = await import('@solana/web3.js');
+    // @ts-ignore — CJS/ESM interop for dynamic import
     const { getAssociatedTokenAddress, getAccount, getMint } = await import('@solana/spl-token');
 
     const connection = new Connection(rpcUrl || process.env.NEXT_PUBLIC_LAZORKIT_RPC_URL || 'https://api.devnet.solana.com', 'confirmed');

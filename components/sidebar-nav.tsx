@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, CreditCard, Send, Image, ShieldAlert, Settings, Compass, BarChart3, Fingerprint, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useWalletStore } from '@/lib/store/wallet';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { motion } from 'framer-motion';
 
 interface SidebarNavProps {
@@ -19,6 +20,19 @@ export function SidebarNav({
   collapsed,
 }: SidebarNavProps) {
   const { pubkey, logout } = useWalletStore();
+  const sdk = useWallet();
+
+  const handleDisconnect = async () => {
+    // Disconnect SDK first to prevent WalletSync auto-restore
+    if (sdk && sdk.disconnect) {
+      try {
+        await sdk.disconnect();
+      } catch (e) {
+        console.warn('SDK disconnect failed:', e);
+      }
+    }
+    logout && logout();
+  };
 
   const menuItems = [
     { id: 'home', label: 'Home', icon: Home },
@@ -115,7 +129,7 @@ export function SidebarNav({
         {/* Auth status icon */}
         {pubkey ? (
           <motion.button
-            onClick={() => logout && logout()}
+            onClick={handleDisconnect}
             animate={{ 
               paddingLeft: collapsed ? "21px" : "16px"
             }}

@@ -9,12 +9,12 @@ import { FiltersBar } from '@/components/filters-bar';
 import { Pagination } from '@/components/pagination';
 import { EmptyState } from '@/components/ui/empty-state';
 import { SkeletonList } from '@/components/ui/skeleton';
-import { useWalletStore, AppCard as AppCardType } from '@/lib/store/wallet';
+import { ECOSYSTEM_APPS, AppCard as AppCardType } from '@/lib/store/wallet';
 import { t } from '@/lib/i18n';
 import React from 'react';
 
 export function AppsTab() {
-  const { apps } = useWalletStore();
+  const apps = ECOSYSTEM_APPS;
   const [selectedApp, setSelectedApp] = useState<AppCardType | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -71,18 +71,10 @@ export function AppsTab() {
     setSelectedApp(app);
   };
 
-  const handleLoadMore = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-      setIsLoading(false);
-    }, 600);
-  };
-
   return (
-    <div className='w-full space-y-6 animate-fade-in'>
+    <div className="w-full space-y-5 animate-fade-in pb-4">
       {/* Search and Filters */}
-      <div className='space-y-4 max-w-2xl'>
+      <div className="space-y-2.5 w-full max-w-7xl mx-auto">
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
@@ -99,38 +91,42 @@ export function AppsTab() {
         />
       </div>
 
-      {/* Apps List */}
+      {/* Main Apps Grid */}
       {isLoading ? (
-        <SkeletonList count={4} />
-      ) : paginatedApps.length > 0 ? (
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 max-w-5xl'>
-          {paginatedApps.map((app) => (
-            <AppCard
-              key={app.id}
-              app={app}
-              layout='list'
-              onClick={() => handleAppClick(app)}
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto">
+          {Array.from({ length: itemsPerPage }).map((_, idx) => (
+            <SkeletonList key={idx} />
           ))}
         </div>
-      ) : (
+      ) : filteredApps.length === 0 ? (
         <EmptyState
           title="No integrations found"
-          description="Try clearing your search query or choosing another category filter."
+          description="Try adjusting your filters or search term to find what you're looking for."
         />
-      )}
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-7xl mx-auto">
+            {paginatedApps.map((app) => (
+              <AppCard
+                key={app.id}
+                app={app}
+                layout="list"
+                onClick={() => setSelectedApp(app)}
+              />
+            ))}
+          </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="max-w-2xl">
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            onLoadMore={handleLoadMore}
-            isLoading={isLoading}
-          />
-        </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="w-full flex justify-center pt-2">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* App Detail Modal */}

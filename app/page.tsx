@@ -22,6 +22,7 @@ import { DepositModalCompact } from '@/components/deposit-modal-compact';
 import { ConnectWalletModal } from '@/components/connect-wallet-modal';
 import { AuthRequiredView } from '@/components/auth-required-view';
 import { LandingPage } from '@/components/landing-page';
+import { TransactionHistoryWidget } from '@/components/transaction-history-widget';
 import { fetchCommonTokens, JupiterToken, defaultConnection } from '@/lib/services/jupiter';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/loading-skeleton';
@@ -115,7 +116,7 @@ export default function HomePage() {
                   <span className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider block">Your Assets</span>
                   <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-extrabold uppercase tracking-wider">Devnet Sync</span>
                 </div>
-                <AssetsTab onDepositClick={() => setDepositModalOpen(true)} />
+                <AssetsTab onDepositClick={() => setDepositModalOpen(true)} compact={true} />
               </div>
             </div>
           </div>
@@ -174,40 +175,46 @@ export default function HomePage() {
 
       case 'send':
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-page-enter">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Send & Receive Assets</h2>
               <p className="text-sm text-muted-foreground">Transfer assets safely on Solana or display your QR code to receive.</p>
             </div>
+            {/* Quick Action Cards */}
             <div className="grid sm:grid-cols-2 gap-4">
-              <Card
-                onClick={() => setSendModalOpen(true)}
-                className="p-6 bg-card border-border hover:border-primary/40 cursor-pointer transition text-center space-y-3 hover-lift"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="text-sm font-bold text-foreground">Send Tokens</h3>
-                <p className="text-xs text-muted-foreground">Send tokens gas-free using a Solana address or username.</p>
-              </Card>
-              <Card
-                onClick={() => setDepositModalOpen(true)}
-                className="p-6 bg-card border-border hover:border-primary/40 cursor-pointer transition text-center space-y-3 hover-lift"
-              >
-                <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto">
-                  <Star className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="text-sm font-bold text-foreground">Receive Tokens</h3>
-                <p className="text-xs text-muted-foreground">Display your public address and QR code to receive funds.</p>
-              </Card>
+              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
+                <Card
+                  onClick={() => setSendModalOpen(true)}
+                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition text-center space-y-3"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/20 flex items-center justify-center mx-auto">
+                    <MessageSquare className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">Send Tokens</h3>
+                  <p className="text-xs text-muted-foreground">Send tokens gas-free using a Solana address.</p>
+                </Card>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
+                <Card
+                  onClick={() => setDepositModalOpen(true)}
+                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition text-center space-y-3"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500/15 to-primary/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                    <Star className="h-6 w-6 text-emerald-400" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">Receive Tokens</h3>
+                  <p className="text-xs text-muted-foreground">Display your public address and QR code to receive funds.</p>
+                </Card>
+              </motion.div>
             </div>
-            <AssetsTab />
+
+            <AssetsTab hideWalletCard={true} />
           </div>
         );
 
       case 'apps':
         return (
-          <div className="space-y-6 animate-fade-in">
+          <div className="space-y-6 animate-page-enter">
             <div>
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Ecosystem Integrations</h2>
               <p className="text-sm text-muted-foreground">Discover verified apps and interactive protocols on Solana Devnet.</p>
@@ -286,9 +293,9 @@ export default function HomePage() {
         </div>
 
         {/* Center Main Scroll View (Cột 2) */}
-        <main ref={mainContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-8">
+        <main ref={mainContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-0">
 
-          <div className="px-4 py-6 md:px-8 md:py-6 w-full max-w-[1360px] mx-auto">
+          <div className={`px-4 py-6 md:px-8 ${activeSection === 'settings' ? 'md:py-2' : 'md:py-6'} w-full max-w-[1360px] mx-auto`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeSection}

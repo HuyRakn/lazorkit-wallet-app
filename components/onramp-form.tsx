@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom';
 import { Settings2, ChevronDown, Search, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
+import { ViewportModal } from './ui/viewport-modal';
 import { OnRampPreviewModal } from './onramp-preview-modal';
 import { createWhateeOrder } from '@/lib/services/payment';
 import { Payment_js_src } from '@/lib/config/payment';
@@ -240,27 +240,27 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
           </button>
         </div>
 
-        <div className='relative rounded-2xl overflow-hidden premium-depth-inset'>
+        <div className='relative rounded-2xl overflow-hidden border border-white/10 premium-depth-inset bg-black/20'>
           {/* Paying Section */}
-          <div className='p-4 pb-5'>
+          <div className='p-5 pb-6 bg-white/[0.01]/10 hover:bg-white/[0.02] transition-colors border-b border-white/10'>
             <div className='flex items-start justify-between'>
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>{t('onRamp.paying')}</div>
                 <button
                   onClick={() => setShowCurrencySelect(true)}
-                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-xl premium-depth-btn-secondary border border-white/10'
                 >
-                  <span className='text-lg text-primary'>
+                  <span className='text-sm text-primary font-black'>
                     {currencyIcons[fromCurrency]}
                   </span>
-                  <span className='font-medium text-xs text-white'>{fromCurrency}</span>
+                  <span className='font-bold text-xs text-white'>{fromCurrency}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
 
               <div className='flex-1 ml-3 text-right'>
                 <div className='mb-1'>
-                  <span className='text-xs text-muted-foreground'>
+                  <span className='text-[10px] text-muted-foreground font-medium'>
                     {fromCurrency === 'VND' ? t('onRamp.minAmount') + ' • ' + t('onRamp.maxAmount') : `${t('onRamp.minAmount')} • ${t('onRamp.maxAmount')}`}
                   </span>
                 </div>
@@ -270,9 +270,9 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                   placeholder={fromCurrency === 'VND' ? '1,000,000' : '100.00'}
                   value={formatDisplayValue(amount)}
                   onChange={(e) => handleAmountChange(e.target.value)}
-                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-white mobile-input'
+                  className='text-xl sm:text-2xl font-black bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/20 text-white mobile-input'
                 />
-                <div className='text-xs text-muted-foreground mt-0.5'>
+                <div className='text-xs text-muted-foreground mt-0.5 font-medium'>
                   {fromCurrency === 'VND'
                     ? `≈ ${amountUsd.toFixed(2)}`
                     : `≈ ${(amountNum * 27000).toLocaleString()} ₫`}
@@ -281,11 +281,8 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
             </div>
           </div>
 
-          {/* Divider Line */}
-          <div className='border-b border-border/10' />
-
           {/* Receiving Section */}
-          <div className='p-4 pt-5'>
+          <div className='p-5 pt-6 pb-6 bg-white/[0.03] hover:bg-white/[0.04] transition-colors'>
             <div className='flex items-start justify-between'>
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>
@@ -293,19 +290,19 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 </div>
                 <button
                   onClick={() => setShowTokenSelect(true)}
-                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-xl premium-depth-btn-secondary border border-white/10'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm text-white'>{toToken}</span>
+                  <span className='font-bold text-xs text-white'>{toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
 
               <div className='flex-1 ml-3 text-right'>
                 <div className='mb-1'>
-                  <span className='text-xs text-muted-foreground'>
+                  <span className='text-[10px] text-muted-foreground font-medium'>
                     {t('common.price')}: 1 {toToken} = ${tokenPrice?.toFixed(2) || '1.00'}
                   </span>
                 </div>
@@ -314,7 +311,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                     ? formatDisplayValue(estimatedReceive.toFixed(6))
                     : '0.000000'}
                 </div>
-                <div className='text-xs text-muted-foreground mt-0.5'>
+                <div className='text-xs text-muted-foreground mt-0.5 font-medium'>
                   ≈ ${(estimatedReceive * tokenPrice).toFixed(2)}
                 </div>
               </div>
@@ -373,251 +370,197 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
         </div>
       </div>
 
-      {showCurrencySelect && mounted && createPortal(
-        <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
-          style={{ animation: 'fadeIn 0.2s ease-out' }}
-          onClick={() => setShowCurrencySelect(false)}
-        >
-           <style jsx>{`
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes slideUp {
-              from { 
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-              }
-              to { 
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-             .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-             .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-             .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
-             .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
-          `}</style>
-          <Card
-            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
-            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
-              <h3 className='font-semibold text-base'>{t('onRamp.selectCurrency')}</h3>
-              <button 
-                onClick={() => setShowCurrencySelect(false)}
-                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
-              >
-                <X className='h-4 w-4 text-muted-foreground' />
-              </button>
-            </div>
+      {/* Enhanced Currency Selection Modal using ViewportModal */}
+      <ViewportModal
+        open={showCurrencySelect}
+        onOpenChange={setShowCurrencySelect}
+        title={t('onRamp.selectCurrency')}
+        className="max-w-md"
+      >
+        <div className='px-4 pt-4 pb-2'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+            <input
+              type='text'
+              placeholder='Search tokens...'
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className='w-full pl-9 pr-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all text-white'
+            />
+          </div>
+        </div>
 
-            <div className='px-3 pt-3 pb-2'>
-              <div className='relative'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                <input
-                  type='text'
-                  placeholder='Search tokens...'
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className='w-full pl-9 pr-3 py-2 bg-muted/30 border border-border/40 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200'
-                />
+        <div className='p-4 space-y-1.5'>
+          {(['VND', 'USD'] as Fiat[]).map((currency, index) => (
+            <button
+              key={currency}
+              onClick={() => {
+                setFromCurrency(currency);
+                setShowCurrencySelect(false);
+                setAmount('');
+                setSelectedQuickAmount(null);
+              }}
+              style={{ animationDelay: `${index * 50}ms` }}
+              className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.01] ${
+                currency === fromCurrency
+                  ? 'bg-primary/10 border border-primary/30 shadow-sm'
+                  : 'bg-white/5 hover:bg-white/10 border border-white/5'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl font-bold ${
+                currency === fromCurrency ? 'bg-primary/20 text-primary' : 'bg-slate-900 text-white'
+              }`}>
+                {currencyIcons[currency]}
               </div>
-            </div>
-
-            <div className='p-3 space-y-1.5'>
-              {(['VND', 'USD'] as Fiat[]).map((currency, index) => (
-                <button
-                  key={currency}
-                  onClick={() => {
-                    setFromCurrency(currency);
-                    setShowCurrencySelect(false);
-                    setAmount('');
-                    setSelectedQuickAmount(null);
-                  }}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
-                    currency === fromCurrency
-                      ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
-                      : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                  }`}
-                >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${
-                    currency === fromCurrency ? 'bg-primary/20' : 'bg-background/50'
-                  }`}>
-                    {currencyIcons[currency]}
-                  </div>
-                  <div className='flex-1 text-left'>
-                    <div className='font-semibold text-sm'>{currency}</div>
-                    <div className='text-xs text-muted-foreground'>
-                      {currency === 'VND' ? 'Vietnamese Dong' : 'US Dollar'}
-                    </div>
-                  </div>
-                  {currency === fromCurrency && (
-                    <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
-                      <div className='w-2 h-2 rounded-full bg-primary-foreground' />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className='px-4 py-2'>
-              <div className='border-t border-border/40 relative'>
-                <div className='absolute -top-2.5 left-1/2 -translate-x-1/2 px-2' style={{ backgroundColor: 'var(--card)' }}>
-                  <span className='text-[10px] text-muted-foreground uppercase tracking-wider font-medium'>
-                    {t('swap.selectToken')}
-                  </span>
+              <div className='flex-1 text-left'>
+                <div className='font-bold text-sm text-white'>{currency}</div>
+                <div className='text-xs text-muted-foreground'>
+                  {currency === 'VND' ? 'Vietnamese Dong' : 'US Dollar'}
                 </div>
               </div>
-            </div>
+              {currency === fromCurrency && (
+                <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
+                  <div className='w-2 h-2 rounded-full bg-slate-950' />
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
 
-            <div className='px-3 pb-3 max-h-[280px] overflow-y-auto custom-scrollbar'>
-              <div className='space-y-1'>
-                {filteredTokens.map((sym, index) => {
-                  const jup = tokenData?.get(sym);
-                  return (
-                    <button
-                      key={`fiat-to-token-${sym}`}
-                      onClick={() => {
-                        setShowCurrencySelect(false);
-                        setSearchTerm('');
-                        onSwitchToSwap?.({ fromToken: sym });
-                      }}
-                      style={{ animationDelay: `${index * 30}ms` }}
-                      className='w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 bg-muted/20 hover:bg-muted/40 hover:scale-[1.01] border border-transparent hover:border-border/40'
-                    >
-                      <div className='w-9 h-9 rounded-full bg-background/50 flex items-center justify-center relative overflow-hidden'>
-                        <TokenLogo symbol={sym} size={22} />
-                        {(jup?.icon || ICON_OVERRIDES[sym]) && (
-                          <img
-                            src={(jup?.icon as string) || ICON_OVERRIDES[sym]!}
-                            alt={sym}
-                            className='absolute inset-0 w-full h-full rounded-full object-cover'
-                            data-fallback={ICON_FALLBACK_2[sym] || ''}
-                            onError={(e) => {
-                              const img = e.currentTarget as HTMLImageElement;
-                              const next = img.getAttribute('data-fallback');
-                              if (next) {
-                                img.setAttribute('data-fallback', '');
-                                img.src = next;
-                              } else {
-                                img.style.display = 'none';
-                              }
-                            }}
-                          />
-                        )}
-                      </div>
-                      <div className='flex-1 text-left'>
-                        <div className='font-medium text-sm'>{sym}</div>
-                        <div className='text-[10px] text-muted-foreground'>
-                          {jup?.name || 'Token'}
-                        </div>
-                      </div>
-                      <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
-                    </button>
-                  );
-                })}
-              </div>
+        <div className='px-4 py-2'>
+          <div className='border-t border-white/10 relative'>
+            <div className='absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 bg-slate-950'>
+              <span className='text-[10px] text-muted-foreground uppercase tracking-wider font-extrabold'>
+                {t('swap.selectToken')}
+              </span>
             </div>
-          </Card>
-        </div>,
-        document.body
-      )}
+          </div>
+        </div>
 
-      {showTokenSelect && mounted && createPortal(
-        <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
-          style={{ animation: 'fadeIn 0.2s ease-out' }}
-          onClick={() => setShowTokenSelect(false)}
-        >
-          <Card
-            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
-            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
-              <h3 className='font-semibold text-base'>{t('onRamp.selectToken')}</h3>
-              <button 
-                onClick={() => setShowTokenSelect(false)}
-                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
-              >
-                <X className='h-4 w-4 text-muted-foreground' />
-              </button>
-            </div>
-
-            <div className='p-3 space-y-1.5'>
-              {(['USDC', 'SOL', 'USDT'] as TokenSym[]).map((token, index) => {
-                const jupiterToken = tokenData?.get(token);
-                const override = ICON_OVERRIDES[token];
-                return (
-                  <button
-                    key={token}
-                    onClick={() => {
-                      setToToken(token);
-                      setShowTokenSelect(false);
-                    }}
-                    style={{ animationDelay: `${index * 50}ms` }}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
-                      token === toToken
-                        ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
-                        : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
-                      token === toToken ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
-                    }`}>
-                      <TokenLogo symbol={token} size={24} />
-                      {(jupiterToken?.icon || override) && (
-                        <img
-                          src={(jupiterToken?.icon as string) || override!}
-                          alt={token}
-                          className='absolute inset-0 w-full h-full rounded-full object-cover'
-                          data-fallback={ICON_FALLBACK_2[token] || ''}
-                          onError={(e) => {
-                            const img = e.currentTarget as HTMLImageElement;
-                            const next = img.getAttribute('data-fallback');
-                            if (next) {
-                              img.setAttribute('data-fallback', '');
-                              img.src = next;
-                            } else {
-                              img.style.display = 'none';
-                            }
-                          }}
-                        />
-                      )}
-                    </div>
-                    <div className='flex-1 text-left'>
-                      <div className='font-semibold text-sm'>{token}</div>
-                      {(
-                        jupiterToken?.id ||
-                        (TOKEN_ADDRESSES as Record<string, string>)[token]
-                      ) && (
-                        <div className='text-[10px] text-muted-foreground font-mono'>
-                          {(
-                            (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
-                          ).slice(0, 4)}...
-                          {(
-                            (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
-                          ).slice(-4)}
-                        </div>
-                      )}
-                    </div>
-                    {token === toToken && (
-                      <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
-                        <div className='w-2 h-2 rounded-full bg-primary-foreground' />
-                      </div>
+        <div className='px-4 pb-4 max-h-[250px] overflow-y-auto custom-scrollbar'>
+          <div className='space-y-1'>
+            {filteredTokens.map((sym, index) => {
+              const jup = tokenData?.get(sym);
+              return (
+                <button
+                  key={`fiat-to-token-${sym}`}
+                  onClick={() => {
+                    setShowCurrencySelect(false);
+                    setSearchTerm('');
+                    onSwitchToSwap?.({ fromToken: sym });
+                  }}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                  className='w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 bg-white/5 hover:bg-white/10 hover:scale-[1.01] border border-white/5'
+                >
+                  <div className='w-9 h-9 rounded-full bg-slate-900 flex items-center justify-center relative overflow-hidden'>
+                    <TokenLogo symbol={sym} size={22} />
+                    {(jup?.icon || ICON_OVERRIDES[sym]) && (
+                      <img
+                        src={(jup?.icon as string) || ICON_OVERRIDES[sym]!}
+                        alt={sym}
+                        className='absolute inset-0 w-full h-full rounded-full object-cover'
+                        data-fallback={ICON_FALLBACK_2[sym] || ''}
+                        onError={(e) => {
+                          const img = e.currentTarget as HTMLImageElement;
+                          const next = img.getAttribute('data-fallback');
+                          if (next) {
+                            img.setAttribute('data-fallback', '');
+                            img.src = next;
+                          } else {
+                            img.style.display = 'none';
+                          }
+                        }}
+                      />
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
-        </div>,
-        document.body
-      )}
+                  </div>
+                  <div className='flex-1 text-left'>
+                    <div className='font-bold text-sm text-white'>{sym}</div>
+                    <div className='text-[10px] text-muted-foreground'>
+                      {jup?.name || 'Token'}
+                    </div>
+                  </div>
+                  <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </ViewportModal>
+
+      {/* Enhanced Token Selection Modal using ViewportModal */}
+      <ViewportModal
+        open={showTokenSelect}
+        onOpenChange={setShowTokenSelect}
+        title={t('onRamp.selectToken')}
+        className="max-w-md"
+      >
+        <div className='p-4 space-y-1.5'>
+          {(['USDC', 'SOL', 'USDT'] as TokenSym[]).map((token, index) => {
+            const jupiterToken = tokenData?.get(token);
+            const override = ICON_OVERRIDES[token];
+            return (
+              <button
+                key={token}
+                onClick={() => {
+                  setToToken(token);
+                  setShowTokenSelect(false);
+                }}
+                style={{ animationDelay: `${index * 50}ms` }}
+                className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all duration-200 hover:scale-[1.01] ${
+                  token === toToken
+                    ? 'bg-primary/10 border border-primary/30 shadow-sm'
+                    : 'bg-white/5 hover:bg-white/10 border border-white/5'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
+                  token === toToken ? 'bg-primary/20 ring-1 ring-primary/30' : 'bg-slate-900'
+                }`}>
+                  <TokenLogo symbol={token} size={24} />
+                  {(jupiterToken?.icon || override) && (
+                    <img
+                      src={(jupiterToken?.icon as string) || override!}
+                      alt={token}
+                      className='absolute inset-0 w-full h-full rounded-full object-cover'
+                      data-fallback={ICON_FALLBACK_2[token] || ''}
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        const next = img.getAttribute('data-fallback');
+                        if (next) {
+                          img.setAttribute('data-fallback', '');
+                          img.src = next;
+                        } else {
+                          img.style.display = 'none';
+                        }
+                      }}
+                    />
+                  )}
+                </div>
+                <div className='flex-1 text-left'>
+                  <div className='font-bold text-sm text-white'>{token}</div>
+                  {(
+                    jupiterToken?.id ||
+                    (TOKEN_ADDRESSES as Record<string, string>)[token]
+                  ) && (
+                    <div className='text-[10px] text-muted-foreground font-mono'>
+                      {(
+                        (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
+                      ).slice(0, 4)}...
+                      {(
+                        (jupiterToken?.id || (TOKEN_ADDRESSES as Record<string, string>)[token]) as string
+                      ).slice(-4)}
+                    </div>
+                  )}
+                </div>
+                {token === toToken && (
+                  <div className='w-5 h-5 rounded-full bg-primary flex items-center justify-center'>
+                    <div className='w-2 h-2 rounded-full bg-slate-950' />
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </ViewportModal>
 
       <OnRampPreviewModal
         open={previewOpen}

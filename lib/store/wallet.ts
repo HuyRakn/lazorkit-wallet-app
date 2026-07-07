@@ -36,13 +36,32 @@ export type {
 };
 // 100% on-chain Devnet mode — no mock data imports
 // Solana ecosystem apps directory (static, no external API needed)
-const ECOSYSTEM_APPS: AppCard[] = [
-  { id: 'nft-creator', name: 'NFT & cNFT Creator', intro: 'Mint gasless NFTs and Compressed NFTs on Solana Devnet', category: 'Tools', tags: ['NFT', 'cNFT', 'Gasless'], image: 'https://www.google.com/s2/favicons?domain=metaplex.com&sz=64', website: '/apps/nft-creator', verified: true },
-  { id: 'jupiter', name: 'Jupiter Exchange', intro: 'Leading swap aggregator on Solana', category: 'DeFi', tags: ['DEX', 'Swap'], image: 'https://www.google.com/s2/favicons?domain=jup.ag&sz=64', website: 'https://jup.ag', verified: true },
-  { id: 'raydium', name: 'Raydium', intro: 'AMM and liquidity provider for Solana', category: 'DeFi', tags: ['AMM', 'Liquidity'], image: 'https://www.google.com/s2/favicons?domain=raydium.io&sz=64', website: 'https://raydium.io', verified: true },
-  { id: 'tensor', name: 'Tensor', intro: 'NFT marketplace and trading platform', category: 'Tools', tags: ['NFT', 'Marketplace'], image: 'https://www.google.com/s2/favicons?domain=tensor.trade&sz=64', website: 'https://tensor.trade', verified: true },
-  { id: 'marinade', name: 'Marinade Finance', intro: 'Liquid staking protocol for SOL', category: 'DeFi', tags: ['Staking', 'mSOL'], image: 'https://www.google.com/s2/favicons?domain=marinade.finance&sz=64', website: 'https://marinade.finance', verified: true },
-  { id: 'dialect', name: 'Dialect', intro: 'Web3 messaging and notifications', category: 'Social', tags: ['Messaging', 'Notifications'], image: 'https://www.google.com/s2/favicons?domain=dialect.to&sz=64', website: 'https://dialect.to', verified: true },
+export const ECOSYSTEM_APPS: AppCard[] = [
+  { id: 'nft-creator', name: 'NFT & cNFT Creator', intro: 'Mint gasless NFTs and Compressed NFTs on Solana Devnet', category: 'Tools', tags: ['NFT', 'cNFT', 'Gasless'], image: 'https://assets.coingecko.com/coins/images/19224/large/metaplex.png', banner: 'https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?w=600&auto=format&fit=crop&q=80', website: '/apps/nft-creator', verified: true },
+  { id: 'jupiter', name: 'Jupiter Exchange', intro: 'Leading swap aggregator on Solana with best-price routing across all DEXes', category: 'DeFi', tags: ['DEX', 'Swap', 'Aggregator'], image: 'https://assets.coingecko.com/coins/images/34188/large/jup.png', banner: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=80', website: 'https://jup.ag', verified: true },
+  { id: 'raydium', name: 'Raydium', intro: 'AMM and concentrated liquidity provider for Solana ecosystem', category: 'DeFi', tags: ['AMM', 'Liquidity', 'Yield'], image: 'https://assets.coingecko.com/coins/images/13917/large/raydium.png', banner: 'https://images.unsplash.com/photo-1642104704074-907c0698cbd9?w=600&auto=format&fit=crop&q=80', website: 'https://raydium.io', verified: true },
+  { id: 'tensor', name: 'Tensor', intro: 'Professional NFT marketplace and real-time trading platform', category: 'NFT', tags: ['NFT', 'Marketplace', 'Trading'], image: 'https://assets.coingecko.com/coins/images/36820/large/tnsr.png', banner: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&auto=format&fit=crop&q=80', website: 'https://tensor.trade', verified: true },
+  { id: 'marinade', name: 'Marinade Finance', intro: 'Native and liquid staking protocol for SOL with mSOL rewards', category: 'DeFi', tags: ['Staking', 'mSOL', 'Yield'], image: 'https://assets.coingecko.com/coins/images/17798/large/msol.png', banner: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80', website: 'https://marinade.finance', verified: true },
+  { id: 'dialect', name: 'Dialect', intro: 'Web3 messaging, notifications, and on-chain alerts', category: 'Social', tags: ['Messaging', 'Notifications'], image: 'https://assets.coingecko.com/coins/images/31822/large/dialect.png', banner: 'https://images.unsplash.com/photo-1611746872915-64382b5c76da?w=600&auto=format&fit=crop&q=80', website: 'https://dialect.to', verified: true },
+  { id: 'magic-eden', name: 'Magic Eden', intro: 'Largest cross-chain NFT marketplace with Solana focus', category: 'NFT', tags: ['NFT', 'Marketplace', 'Collections'], image: 'https://assets.coingecko.com/coins/images/36208/large/ME_Logo_Digital_Gradient.png', banner: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?w=600&auto=format&fit=crop&q=80', website: 'https://magiceden.io', verified: true },
+  { id: 'orca', name: 'Orca', intro: 'User-friendly DEX with concentrated liquidity whirlpools', category: 'DeFi', tags: ['DEX', 'Whirlpools', 'Liquidity'], image: 'https://assets.coingecko.com/coins/images/17547/large/Orca_Logo.png', banner: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80', website: 'https://orca.so', verified: true },
+  { id: 'drift', name: 'Drift Protocol', intro: 'Decentralized perpetual futures and spot trading on Solana', category: 'DeFi', tags: ['Perps', 'Trading', 'Futures'], image: 'https://assets.coingecko.com/coins/images/37390/large/drift.png', banner: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=600&auto=format&fit=crop&q=80', website: 'https://drift.trade', verified: true },
+  { id: 'jito', name: 'Jito', intro: 'MEV-optimized liquid staking with JitoSOL and enhanced validator rewards', category: 'DeFi', tags: ['Staking', 'MEV', 'JitoSOL'], image: 'https://assets.coingecko.com/coins/images/33481/large/jto.png', banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&auto=format&fit=crop&q=80', website: 'https://jito.network', verified: true },
+  { id: 'metaplex', name: 'Metaplex', intro: 'NFT protocol and creators tools — Core, Bubblegum, Candy Machine', category: 'Tools', tags: ['NFT', 'Protocol', 'Creator'], image: 'https://assets.coingecko.com/coins/images/19224/large/metaplex.png', banner: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=600&auto=format&fit=crop&q=80', website: 'https://metaplex.com', verified: true },
+  { id: 'realms', name: 'Realms', intro: 'On-chain governance and DAO voting platform for Solana protocols', category: 'Social', tags: ['DAO', 'Governance', 'Voting'], image: 'https://assets.coingecko.com/coins/images/26359/large/realms.png', banner: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80', website: 'https://realms.today', verified: true },
+  { id: 'squads', name: 'Squads', intro: 'Multisig wallet and treasury management for teams and DAOs', category: 'Tools', tags: ['Multisig', 'Treasury', 'Security'], image: 'https://assets.coingecko.com/coins/images/30746/large/squads.png', banner: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600&auto=format&fit=crop&q=80', website: 'https://squads.so', verified: true },
+  { id: 'drip', name: 'DRiP', intro: 'Free collectibles and NFT drops from Solana artists and creators', category: 'NFT', tags: ['Drops', 'Art', 'Free'], image: 'https://assets.coingecko.com/coins/images/32822/large/drip.jpg', banner: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&auto=format&fit=crop&q=80', website: 'https://drip.haus', verified: true },
+  { id: 'phantom', name: 'Phantom', intro: 'The friendly crypto wallet for Solana, Ethereum, and Bitcoin', category: 'Tools', tags: ['Wallet', 'Browser', 'Multi-chain'], image: 'https://assets.coingecko.com/coins/images/29283/large/phantom.png', banner: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=600&auto=format&fit=crop&q=80', website: 'https://phantom.app', verified: true },
+  { id: 'solpay', name: 'SolPay Mini', intro: 'Fast, secure, and decentralized merchant payments on Solana Pay protocol', category: 'DeFi', tags: ['Payments', 'Merchant', 'SolPay'], image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png', banner: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=600&auto=format&fit=crop&q=80', website: 'https://solpay.solana.com', verified: true },
+  { id: 'orbit-dex', name: 'Orbit Dex', intro: 'High-frequency orderbook and AMM trading platform on Solana', category: 'DeFi', tags: ['DEX', 'Trading', 'Orderbook'], image: 'https://assets.coingecko.com/coins/images/325/large/Tether.png', banner: 'https://images.unsplash.com/photo-1614064641938-3bbee52942c7?w=600&auto=format&fit=crop&q=80', website: 'https://orbit.exchange', verified: true },
+  { id: 'ripple-chat', name: 'RippleChat', intro: 'End-to-end encrypted messaging and group chats on Solana Identity', category: 'Social', tags: ['Messaging', 'Encrypted', 'Chat'], image: 'https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png', banner: 'https://images.unsplash.com/photo-1611605698335-8b15d27e03f2?w=600&auto=format&fit=crop&q=80', website: 'https://ripple.chat', verified: true },
+  { id: 'keystone-tools', name: 'Keystone Tools', intro: 'Security configuration utilities and airgapped key diagnostics', category: 'Tools', tags: ['Security', 'Diagnostics', 'Hardware'], image: 'https://assets.coingecko.com/coins/images/10365/large/Key.png', banner: 'https://images.unsplash.com/photo-1600132806370-bf17e65e942f?w=600&auto=format&fit=crop&q=80', website: 'https://keystone.tools', verified: true },
+  { id: 'solana-social', name: 'Solana Social', intro: 'Decentralized social networking protocol and profile indexer', category: 'Social', tags: ['Social', 'Networking', 'Profiles'], image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png', banner: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&auto=format&fit=crop&q=80', website: 'https://solana.social', verified: true },
+  { id: 'pyth-network', name: 'Pyth Network', intro: 'First-party financial oracle network providing real-time market data to smart contracts', category: 'Tools', tags: ['Oracle', 'Data', 'Feeds'], image: 'https://assets.coingecko.com/coins/images/31924/large/pyth.png', banner: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80', website: 'https://pyth.network', verified: true },
+  { id: 'kamino-finance', name: 'Kamino Finance', intro: 'One-stop DeFi shop on Solana combining Lending, Liquidity, and Leverage', category: 'DeFi', tags: ['Lending', 'Liquidity', 'Leverage'], image: 'https://assets.coingecko.com/coins/images/36881/large/kamino.png', banner: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&auto=format&fit=crop&q=80', website: 'https://kamino.finance', verified: true },
+  { id: 'marginfi', name: 'Marginfi', intro: 'Decentralized lending protocol on Solana prioritizing risk management and yield', category: 'DeFi', tags: ['Lending', 'Borrowing', 'Yield'], image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png', banner: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&auto=format&fit=crop&q=80', website: 'https://marginfi.com', verified: true },
+  { id: 'helius', name: 'Helius', intro: 'The leading developer platform on Solana for RPCs, APIs, and Webhooks', category: 'Tools', tags: ['RPC', 'APIs', 'Developer'], image: 'https://assets.coingecko.com/coins/images/4128/large/solana.png', banner: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80', website: 'https://helius.dev', verified: true },
+  { id: 'helium', name: 'Helium', intro: 'Decentralized wireless infrastructure network built on Solana blockchain', category: 'Social', tags: ['IoT', 'Mobile', 'Wireless'], image: 'https://assets.coingecko.com/coins/images/13554/large/hnt.png', banner: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=600&auto=format&fit=crop&q=80', website: 'https://helium.com', verified: true },
 ];
 
 /** Result from swapReal() — contains data needed for component to sign via LazorKit SDK */
@@ -484,19 +503,39 @@ export const useWalletStore = create<WalletState>()(
             activity: []
           });
           
-          // Xóa passkeyData khỏi localStorage để đảm bảo đăng xuất hoàn toàn
+          // Set explicit logout flag to prevent WalletSync from auto-restoring
           if (typeof window !== 'undefined') {
             try {
+              localStorage.setItem('lazorkit-explicit-logout', 'true');
+              
+              // Clear passkey and session data
               localStorage.removeItem('lazorkit-passkey-data');
               localStorage.removeItem('lz_last_ref');
+              
+              // Clear SDK internal session keys
+              localStorage.removeItem('lazorkit-smart-wallet-id-devnet');
+              localStorage.removeItem('lazorkit-smart-wallet-id-mainnet');
+              
+              // Clear any other lazorkit-* keys the SDK may have set
+              const keysToRemove: string[] = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('lazorkit-') || key.startsWith('lz_')) && key !== 'lazorkit-wallet-storage' && key !== 'lazorkit-explicit-logout') {
+                  keysToRemove.push(key);
+                }
+              }
+              keysToRemove.forEach(key => localStorage.removeItem(key));
+              
+              // Also clear the persisted zustand store to prevent stale hasWallet=true
+              localStorage.removeItem('lazorkit-wallet-storage');
             } catch (e) {
               console.warn('Failed to clear localStorage:', e);
             }
           }
           
-          // Redirect to /buy after logout
+          // Redirect to root after logout
           if (typeof window !== 'undefined') {
-            window.location.href = '/buy';
+            window.location.href = '/';
           }
         },
 

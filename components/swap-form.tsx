@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
+import { ViewportModal } from './ui/viewport-modal';
 import { useWalletStore, TokenSym, SwapResult } from '@/lib/store/wallet';
 import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { motion } from 'framer-motion';
@@ -313,9 +314,9 @@ export const SwapForm = ({
         </div>
 
         {/* Two Adjacent Input Sections with Overlapping Swap Button */}
-        <div className='relative rounded-2xl overflow-hidden premium-depth-inset'>
+        <div className='relative rounded-2xl overflow-hidden border border-white/10 premium-depth-inset bg-black/20'>
           {/* Selling Section */}
-          <div className='p-4 pb-5'>
+          <div className='p-5 pb-6 bg-white/[0.01]/10 hover:bg-white/[0.02] transition-colors border-b border-white/10'>
             <div className='flex items-start justify-between'>
               {/* Left side - Label and selector */}
               <div>
@@ -324,12 +325,12 @@ export const SwapForm = ({
                 </div>
                 <button
                   onClick={() => setShowTokenSelect('from')}
-                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-xl premium-depth-btn-secondary border border-white/10'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(fromToken)}
                   </div>
-                  <span className='font-medium text-xs text-white'>{fromToken}</span>
+                  <span className='font-bold text-xs text-white'>{fromToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -337,20 +338,20 @@ export const SwapForm = ({
               {/* Right side - Balance, buttons and input */}
               <div className='flex-1 ml-3 text-right'>
                 <div className='flex items-center justify-end gap-1.5 mb-1 h-4'>
-                  <span className='text-xs text-muted-foreground whitespace-nowrap'>
+                  <span className='text-[10px] text-muted-foreground font-medium whitespace-nowrap'>
                     {formatBalance(fromBalanceAmount, fromToken)}
                   </span>
                   {fromBalanceAmount > 0 && (
                     <>
                       <button
                         onClick={handleHalfClick}
-                        className='px-2 py-0.5 text-[10px] font-bold rounded premium-depth-btn-secondary'
+                        className='px-2 py-0.5 text-[9px] font-black rounded bg-white/5 border border-white/10 text-muted-foreground hover:text-white transition'
                       >
                         HALF
                       </button>
                       <button
                         onClick={handleMaxClick}
-                        className='px-2 py-0.5 text-[10px] font-bold rounded premium-depth-btn-secondary'
+                        className='px-2 py-0.5 text-[9px] font-black rounded bg-white/5 border border-white/10 text-muted-foreground hover:text-white transition'
                       >
                         MAX
                       </button>
@@ -365,17 +366,14 @@ export const SwapForm = ({
                   onChange={(e) =>
                     handleAmountChange(e.target.value.replace(/,/g, ''))
                   }
-                  className='text-xl sm:text-2xl font-semibold bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/30 text-white mobile-input'
+                  className='text-xl sm:text-2xl font-black bg-transparent border-0 p-0 h-auto text-right focus-visible:ring-0 placeholder:text-muted-foreground/20 text-white mobile-input'
                 />
-                <div className='text-xs text-muted-foreground mt-0.5'>
+                <div className='text-xs text-muted-foreground mt-0.5 font-medium'>
                   {formatCurrency(amountUsd, 'USD')}
                 </div>
               </div>
             </div>
           </div>
-
-          {/* Divider line */}
-          <div className='border-b border-border/10' />
 
           {/* Enhanced Swap Button - Cosmic 3D Depth Overlap */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
@@ -384,26 +382,26 @@ export const SwapForm = ({
               whileTap={{ scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 450, damping: 22 }}
               onClick={handleSwapTokens}
-              className="p-3 rounded-full bg-card border border-primary/30 text-white shadow-[0_0_15px_rgba(22,255,187,0.25),inset_0_1px_1px_rgba(255,255,255,0.1)] hover:border-primary cursor-pointer active:scale-95"
+              className="p-3 rounded-full bg-background border-2 border-white/10 text-white shadow-lg hover:border-primary cursor-pointer active:scale-95 flex items-center justify-center"
             >
               <ArrowUpDown className="h-4.5 w-4.5 text-primary" />
             </motion.button>
           </div>
 
           {/* Buying Section */}
-          <div className='p-4 pt-5'>
+          <div className='p-5 pt-6 pb-6 bg-white/[0.03] hover:bg-white/[0.04] transition-colors'>
             <div className='flex items-start justify-between'>
               {/* Left side - Label and selector */}
               <div>
                 <div className='text-xs text-muted-foreground mb-2'>{t('swap.to')}</div>
                 <button
                   onClick={() => setShowTokenSelect('to')}
-                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-full premium-depth-btn-secondary'
+                  className='flex items-center gap-1.5 px-3 py-1.5 rounded-xl premium-depth-btn-secondary border border-white/10'
                 >
                   <div className='flex items-center'>
                     {getTokenIcon(toToken)}
                   </div>
-                  <span className='font-medium text-sm text-white'>{toToken}</span>
+                  <span className='font-bold text-xs text-white'>{toToken}</span>
                   <ChevronDown className='h-3 w-3 text-muted-foreground' />
                 </button>
               </div>
@@ -412,7 +410,7 @@ export const SwapForm = ({
               <div className='flex-1 ml-3 text-right'>
                 <div className='h-4 mb-1'>
                   {toTokenData && (
-                    <span className='text-xs text-muted-foreground whitespace-nowrap'>
+                    <span className='text-[10px] text-muted-foreground font-medium whitespace-nowrap'>
                       {formatBalance(toTokenData.amount, toToken)}
                     </span>
                   )}
@@ -532,191 +530,150 @@ export const SwapForm = ({
         </div>
       </div>
 
-      {/* Enhanced Token Selection Modal */}
-      {showTokenSelect && mounted && createPortal(
-        <div
-          className='fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center transition-all duration-300 ease-out'
-          style={{ animation: 'fadeIn 0.2s ease-out' }}
-          onClick={() => {
+      {/* Enhanced Token Selection Modal using ViewportModal */}
+      <ViewportModal
+        open={showTokenSelect !== null}
+        onOpenChange={(open) => {
+          if (!open) {
             setShowTokenSelect(null);
             setSearchTerm('');
-          }}
-        >
-          <style jsx>{`
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes slideUp {
-              from { 
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-              }
-              to { 
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-            .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-            .custom-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 3px; }
-            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
-          `}</style>
-          <Card
-            className='w-full max-w-md mx-4 sm:mx-0 overflow-hidden shadow-2xl border-border/60'
-            style={{ animation: 'slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header with close button */}
-            <div className='flex items-center justify-between p-4 border-b border-border/60 bg-card/50 backdrop-blur-sm'>
-              <h3 className='font-semibold text-base'>{t('swap.selectToken')}</h3>
-              <button 
-                onClick={() => {
-                  setShowTokenSelect(null);
-                  setSearchTerm('');
-                }}
-                className='p-1 rounded-lg hover:bg-muted/50 transition-all duration-200'
-              >
-                <X className='h-4 w-4 text-muted-foreground' />
-              </button>
-            </div>
+          }
+        }}
+        title={t('swap.selectToken')}
+        className="max-w-md"
+      >
+        {/* Search bar */}
+        <div className='px-4 pt-4 pb-2'>
+          <div className='relative'>
+            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+            <input
+              type='text'
+              placeholder='Search tokens...'
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className='w-full pl-9 pr-3 py-2 bg-slate-900/50 border border-white/10 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary transition-all text-white'
+            />
+          </div>
+        </div>
 
-            {/* Search bar */}
-            <div className='px-4 pt-3 pb-2'>
-              <div className='relative'>
-                <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-                <input
-                  type='text'
-                  placeholder='Search tokens...'
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className='w-full pl-9 pr-3 py-2 bg-muted/30 border border-border/40 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200'
-                />
+        {/* Fiat options to switch back to Buy (only for 'from' selection) */}
+        {showTokenSelect === 'from' && (
+          <div className='px-4 pb-3'>
+            <div className='space-y-1.5'>
+              {fiatOptions.map((fiat, index) => (
+                <button
+                  key={`fiat-${fiat}`}
+                  onClick={() => {
+                    setShowTokenSelect(null);
+                    setSearchTerm('');
+                    onSwitchToBuy?.({ fiat });
+                  }}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  className='w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 bg-white/5 hover:bg-white/10 hover:scale-[1.01] border border-white/5'
+                >
+                  <div className='flex items-center gap-3'>
+                    <div className='w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-lg font-bold text-white'>
+                      {fiat === 'USD' ? '$' : '₫'}
+                    </div>
+                    <div className='text-left'>
+                      <div className='font-bold text-sm text-white'>{fiat}</div>
+                      <div className='text-xs text-muted-foreground'>
+                        {fiat === 'USD' ? 'US Dollar' : 'Vietnamese Dong'}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
+                </button>
+              ))}
+            </div>
+            <div className='border-t border-white/10 mt-4 pt-3'>
+              <div className='text-[10px] text-muted-foreground text-center uppercase tracking-wider font-extrabold'>
+                Or select token
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Fiat options to switch back to Buy (only for 'from' selection) */}
-            {showTokenSelect === 'from' && (
-              <div className='px-4 pb-3'>
-                <div className='space-y-1.5'>
-                  {fiatOptions.map((fiat, index) => (
-                    <button
-                      key={`fiat-${fiat}`}
-                      onClick={() => {
-                        setShowTokenSelect(null);
-                        setSearchTerm('');
-                        onSwitchToBuy?.({ fiat });
-                      }}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                      className='w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 bg-muted/30 hover:bg-muted/50 hover:scale-[1.01] border border-transparent hover:border-border/40'
-                    >
-                      <div className='flex items-center gap-3'>
-                        <div className='w-10 h-10 rounded-full bg-background/50 flex items-center justify-center text-lg font-semibold'>
-                          {fiat === 'USD' ? '$' : '₫'}
-                        </div>
-                        <div className='text-left'>
-                          <div className='font-medium text-sm'>{fiat}</div>
-                          <div className='text-xs text-muted-foreground'>
-                            {fiat === 'USD' ? 'US Dollar' : 'Vietnamese Dong'}
-                          </div>
-                        </div>
+        {/* Token Options - Scrollable */}
+        <div className='px-4 pb-4 max-h-[300px] overflow-y-auto custom-scrollbar'>
+          <div className='space-y-1.5'>
+            {filteredTokens.map((tokenSymbol, index) => {
+              const token = tokens.find((t) => t.symbol === tokenSymbol);
+              const jupiterToken = tokenData?.get(tokenSymbol);
+              const isSelected = (showTokenSelect === 'from' && tokenSymbol === fromToken) ||
+                               (showTokenSelect === 'to' && tokenSymbol === toToken);
+
+              if (!token) return null;
+
+              return (
+                <button
+                  key={token.symbol}
+                  onClick={() => {
+                    if (showTokenSelect === 'from') {
+                      setFromToken(token.symbol);
+                    } else {
+                      setToToken(token.symbol);
+                    }
+                    setShowTokenSelect(null);
+                    setSearchTerm('');
+                  }}
+                  style={{ animationDelay: `${index * 30}ms` }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 hover:scale-[1.01] ${
+                    isSelected
+                      ? 'bg-primary/10 border border-primary/30 shadow-sm'
+                      : 'bg-white/5 hover:bg-white/10 border border-white/5'
+                  }`}
+                >
+                  <div className='flex items-center gap-3'>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden relative ${
+                      isSelected ? 'bg-primary/20 ring-1 ring-primary/30' : 'bg-slate-900'
+                    }`}>
+                      {jupiterToken?.icon ? (
+                        <img
+                          src={jupiterToken.icon}
+                          alt={token.symbol}
+                          className='w-full h-full object-cover rounded-full'
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            const next = e.currentTarget.nextSibling as HTMLElement;
+                            if (next) next.classList.remove('hidden');
+                          }}
+                        />
+                      ) : null}
+                      <div className={jupiterToken?.icon ? 'hidden' : ''}>
+                        <TokenLogo symbol={token.symbol} size={24} />
                       </div>
-                      <ChevronDown className='h-4 w-4 text-muted-foreground rotate-[-90deg]' />
-                    </button>
-                  ))}
-                </div>
-                <div className='border-t border-border/40 mt-3 pt-3'>
-                  <div className='text-xs text-muted-foreground text-center uppercase tracking-wider font-medium'>
-                    Or select token
+                    </div>
+                    <div className='text-left'>
+                      <div className='font-bold text-sm text-white'>{token.symbol}</div>
+                      <div className='text-xs text-muted-foreground'>
+                        {jupiterToken?.name || `${token.symbol} Token`}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                  <div className='text-right'>
+                    <div className='text-sm font-extrabold text-white'>
+                      {token.amount.toFixed(4)} {token.symbol}
+                    </div>
+                    <div className='text-[10px] text-muted-foreground'>
+                      {formatCurrency(token.amount * token.priceUsd, 'USD')}
+                    </div>
+                    <div className='text-[10px] font-bold text-primary'>
+                      {formatCurrency(jupiterToken?.usdPrice || token.priceUsd, 'USD')}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+            {filteredTokens.length === 0 && (
+              <div className='text-center py-8 text-muted-foreground'>
+                <div className='text-sm font-bold'>No tokens found</div>
+                <div className='text-xs mt-1'>Try a different search term</div>
               </div>
             )}
-
-            {/* Token Options - Scrollable */}
-            <div className='px-4 pb-4 max-h-[350px] overflow-y-auto custom-scrollbar'>
-              <div className='space-y-1.5'>
-                {filteredTokens.map((tokenSymbol, index) => {
-                const token = tokens.find((t) => t.symbol === tokenSymbol);
-                const jupiterToken = tokenData?.get(tokenSymbol);
-                  const isSelected = (showTokenSelect === 'from' && tokenSymbol === fromToken) ||
-                                   (showTokenSelect === 'to' && tokenSymbol === toToken);
-
-                if (!token) return null;
-
-                return (
-                  <button
-                    key={token.symbol}
-                    onClick={() => {
-                      if (showTokenSelect === 'from') {
-                        setFromToken(token.symbol);
-                      } else {
-                        setToToken(token.symbol);
-                      }
-                      setShowTokenSelect(null);
-                        setSearchTerm('');
-                      }}
-                      style={{ animationDelay: `${index * 30}ms` }}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl transition-all duration-200 hover:scale-[1.02] ${
-                        isSelected
-                          ? 'bg-primary/15 border-2 border-primary/40 shadow-sm'
-                          : 'bg-muted/30 hover:bg-muted/50 border-2 border-transparent'
-                      }`}
-                    >
-                      <div className='flex items-center gap-3'>
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center overflow-hidden ${
-                          isSelected ? 'bg-primary/20 ring-2 ring-primary/30' : 'bg-background/50'
-                        }`}>
-                        {jupiterToken?.icon ? (
-                          <img
-                            src={jupiterToken.icon}
-                            alt={token.symbol}
-                              className='w-full h-full object-cover rounded-full'
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const next = e.currentTarget.nextSibling as HTMLElement;
-                                if (next) next.classList.remove('hidden');
-                              }}
-                            />
-                          ) : null}
-                          <div className={jupiterToken?.icon ? 'hidden' : ''}>
-                            <TokenLogo symbol={token.symbol} size={24} />
-                      </div>
-                        </div>
-                        <div className='text-left'>
-                          <div className='font-semibold text-sm'>{token.symbol}</div>
-                        <div className='text-xs text-muted-foreground'>
-                          {jupiterToken?.name || `${token.symbol} Token`}
-                        </div>
-                      </div>
-                    </div>
-                    <div className='text-right'>
-                        <div className='text-sm font-medium'>
-                          {token.amount.toFixed(4)} {token.symbol}
-                      </div>
-                      <div className='text-xs text-muted-foreground'>
-                        {formatCurrency(token.amount * token.priceUsd, 'USD')}
-                      </div>
-                        <div className='text-xs font-medium text-primary'>
-                          {formatCurrency(jupiterToken?.usdPrice || token.priceUsd, 'USD')}
-                        </div>
-                    </div>
-                      {/* Selected border only - no dot */}
-                  </button>
-                );
-              })}
-                {filteredTokens.length === 0 && (
-                  <div className='text-center py-8 text-muted-foreground'>
-                    <div className='text-sm'>No tokens found</div>
-                    <div className='text-xs mt-1'>Try a different search term</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-        </div>,
-        document.body
-      )}
+          </div>
+        </div>
+      </ViewportModal>
 
       <SwapReviewModal
         open={reviewOpen}

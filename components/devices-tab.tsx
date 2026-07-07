@@ -298,8 +298,68 @@ export const DevicesTab = () => {
   ];
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12 animate-page-enter">
       
+      {/* Wallet Identity Card */}
+      {pubkey && (
+        <div className="premium-depth-card rounded-2xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/20 flex items-center justify-center">
+                <ShieldCheck className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Passkey Vault</h3>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {pubkey.slice(0, 6)}...{pubkey.slice(-6)}
+                  </span>
+                  <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    SECP256R1
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="text-[9px] font-bold text-primary">DEVNET</span>
+            </div>
+          </div>
+
+          {/* Security Score */}
+          <div className="space-y-2 pt-2 border-t border-border/20">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Security Score</span>
+              <span className="text-[10px] font-bold text-primary">
+                {Math.min(100, Math.max(33, (connectedDevices.length > 0 ? 66 : 33) + (connectedDevices.length >= 2 ? 34 : 0)))}%
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, Math.max(33, (connectedDevices.length > 0 ? 66 : 33) + (connectedDevices.length >= 2 ? 34 : 0)))}%` }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+                className="h-full rounded-full bg-gradient-to-r from-primary to-accent"
+              />
+            </div>
+            <div className="flex items-center gap-4 text-[9px] text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>Passkey Active</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${connectedDevices.length > 0 ? 'bg-emerald-400' : 'bg-muted-foreground/30'}`} />
+                <span>Multi-Device: {connectedDevices.length > 0 ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${connectedDevices.length >= 2 ? 'bg-emerald-400' : 'bg-muted-foreground/30'}`} />
+                <span>Backup: {connectedDevices.length >= 2 ? 'Active' : 'Not Set'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header section */}
       <div>
         <h2 className="text-2xl font-black text-white tracking-wide">Passkey Vault Security</h2>
@@ -308,7 +368,7 @@ export const DevicesTab = () => {
         </p>
       </div>
 
-      {/* Symmetric Dual Column Layout to occupy full viewport space evenly */}
+      {/* Symmetric Dual Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
         
         {/* LEFT COLUMN: Authorized Devices & Incoming Requests */}

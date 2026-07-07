@@ -45,7 +45,7 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
   // Refresh balances once on mount
   useEffect(() => {
     if (typeof refreshBalances === 'function') {
-      refreshBalances().catch(() => {});
+      refreshBalances().catch(() => { });
     }
   }, [refreshBalances]);
 
@@ -67,88 +67,170 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
 
   return (
     <div className="flex flex-col w-full space-y-8 select-none p-0 bg-transparent border-0 shadow-none">
-      {/* 1. Dynamic Buy/Swap Form (Centered, Spacious Layout) */}
-      <div className="w-full flex flex-col">
-        {/* Toggle Mode Bar */}
-        <div className="flex gap-1.5 p-1 rounded-xl mb-6 w-full max-w-[360px] mx-auto premium-depth-inset">
-          <button
-            onClick={() => {
-              setMode('buy');
-              setActiveChartToken('USDC');
-            }}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-              mode === 'buy'
+      {/* Desktop Split Layout */}
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Left Column: Trade Form + Chart (main) */}
+        <div className="flex-1 min-w-0 flex flex-col space-y-6">
+          {/* Toggle Mode Bar */}
+          <div className="flex gap-1.5 p-1 rounded-xl mb-6 w-full max-w-[360px] mx-auto premium-depth-inset">
+            <button
+              onClick={() => {
+                setMode('buy');
+                setActiveChartToken('USDC');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${mode === 'buy'
                 ? 'bg-gradient-to-r from-primary to-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.2)]'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <CreditCard className="h-4 w-4" />
-            <span>Buy Crypto</span>
-          </button>
-          <button
-            onClick={() => {
-              setMode('swap');
-              // restore last active token if possible
-              setActiveChartToken(swapInit?.toToken || 'SOL');
-            }}
-            className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${
-              mode === 'swap'
+                }`}
+            >
+              <CreditCard className="h-4 w-4" />
+              <span>Buy Crypto</span>
+            </button>
+            <button
+              onClick={() => {
+                setMode('swap');
+                // restore last active token if possible
+                setActiveChartToken(swapInit?.toToken || 'SOL');
+              }}
+              className={`flex-1 py-2 px-3 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${mode === 'swap'
                 ? 'bg-gradient-to-r from-primary to-accent text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_2px_4px_rgba(0,0,0,0.2)]'
                 : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-            <span>Swap Token</span>
-          </button>
-        </div>
+                }`}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              <span>Swap Token</span>
+            </button>
+          </div>
 
-        {/* Dynamic Form Render (Stretches 100% width to match the page title) */}
-        <div className="w-full premium-depth-card rounded-2xl p-6 relative z-20">
-          {mode === 'buy' ? (
-            <ErrorBoundary>
-              <OnRampForm
-                tokenData={tokenData}
-                onSwitchToSwap={({ fromToken, toToken }) => {
-                  setSwapInit({ fromToken, toToken });
-                  setMode('swap');
-                  setAutoApplied(true);
-                }}
-                initialFromCurrency={buyInitFiat}
-                onTokenChange={(token) => setActiveChartToken(token)}
+          {/* Dynamic Form Render (Stretches 100% width to match the page title) */}
+          <div className="w-full premium-depth-card rounded-2xl p-6 relative z-20">
+            {mode === 'buy' ? (
+              <ErrorBoundary>
+                <OnRampForm
+                  tokenData={tokenData}
+                  onSwitchToSwap={({ fromToken, toToken }) => {
+                    setSwapInit({ fromToken, toToken });
+                    setMode('swap');
+                    setAutoApplied(true);
+                  }}
+                  initialFromCurrency={buyInitFiat}
+                  onTokenChange={(token) => setActiveChartToken(token)}
+                />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary>
+                <SwapForm
+                  tokenData={tokenData}
+                  initialFromToken={swapInit?.fromToken}
+                  initialToToken={swapInit?.toToken}
+                  onSwitchToBuy={({ fiat }) => {
+                    setBuyInitFiat(fiat);
+                    setMode('buy');
+                    setAutoApplied(true);
+                  }}
+                  onTokenChange={(token) => setActiveChartToken(token)}
+                />
+              </ErrorBoundary>
+            )}
+          </div>
+
+          {/* 1.1 Integrated Live Price Chart underneath Buy / Swap forms */}
+          {(
+            <div className="w-full space-y-2">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">{activeChartToken} / USD Live Price Feed</span>
+              <PriceChart
+                symbol={getTradingViewSymbol(activeChartToken)}
+                tokenSymbol={activeChartToken}
+                height="h-[240px]"
               />
-            </ErrorBoundary>
-          ) : (
-            <ErrorBoundary>
-              <SwapForm
-                tokenData={tokenData}
-                initialFromToken={swapInit?.fromToken}
-                initialToToken={swapInit?.toToken}
-                onSwitchToBuy={({ fiat }) => {
-                  setBuyInitFiat(fiat);
-                  setMode('buy');
-                  setAutoApplied(true);
-                }}
-                onTokenChange={(token) => setActiveChartToken(token)}
-              />
-            </ErrorBoundary>
+            </div>
           )}
         </div>
 
-        {/* 1.1 Integrated Live Price Chart underneath Buy / Swap forms */}
-        {mode !== 'chart' && (
-          <div className="w-full mt-6 space-y-2">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">{activeChartToken} / USD Live Price Feed</span>
-            <PriceChart
-              symbol={getTradingViewSymbol(activeChartToken)}
-              tokenSymbol={activeChartToken}
-              height="h-[240px]"
-            />
+        {/* Right Column: Portfolio Summary (Desktop Only) */}
+        <div className="hidden lg:flex flex-col w-[320px] shrink-0 space-y-4 lg:pt-[64px]">
+          {/* Quick Stats */}
+          <div className="premium-depth-card rounded-2xl p-5 space-y-4">
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Portfolio Summary</h4>
+            <div className="section-divider" />
+            {tokens.length > 0 ? (
+              <div className="space-y-3">
+                {tokens.slice(0, 5).map((token: any) => (
+                  <div key={token.symbol || token.mint} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 border border-border/30 flex items-center justify-center text-[9px] font-bold text-primary">
+                        {(token.symbol || '?').slice(0, 2)}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-foreground">{token.symbol || 'Unknown'}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-foreground">
+                      {typeof token.amount === 'number' ? token.amount.toFixed(4) : token.amount}
+                    </span>
+                  </div>
+                ))}
+                {tokens.length > 5 && (
+                  <p className="text-[9px] text-muted-foreground text-center pt-1">
+                    +{tokens.length - 5} more tokens
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-6 space-y-2">
+                <BarChart2 className="h-6 w-6 text-muted-foreground/20 mx-auto" />
+                <p className="text-[10px] text-muted-foreground">No assets yet. Buy or receive tokens to get started.</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Network Info */}
+          <div className="premium-depth-card rounded-2xl p-5 space-y-3">
+            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Network</h4>
+            <div className="section-divider" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Chain</span>
+                <span className="font-bold text-foreground">Solana</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Cluster</span>
+                <span className="font-bold text-purple-400">Devnet</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Gas</span>
+                <span className="font-bold text-primary">Sponsored</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Swap Router</span>
+                <span className="font-bold text-foreground">Jupiter v6</span>
+              </div>
+            </div>
+          </div>
+
+          {/* AI-generated Trading Art Card to fill empty space */}
+          <div className="premium-depth-card rounded-2xl overflow-hidden p-0 border border-white/5 shadow-2xl relative group">
+            <div className="relative h-[210px] w-full overflow-hidden">
+              <img
+                src="/crypto_trading_art.png"
+                alt="Crypto Dex Visualizer"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+            </div>
+            <div className="p-4 relative -mt-6 bg-background/90 backdrop-blur-sm border-t border-white/5">
+              <span className="text-[9px] font-bold text-primary uppercase tracking-widest block">RampFi Intel</span>
+              <h5 className="text-[11px] font-extrabold text-foreground mt-0.5">Real-time Web3 DEX Intelligence</h5>
+              <p className="text-[9px] text-muted-foreground mt-1 leading-normal">
+                Sensing liquidity depth, on-chain slippage routes, and cross-exchange spreads continuously.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Elegant Divider */}
-      <div className="border-t border-border/40 w-full" />
+      <div className="section-divider w-full" />
 
       {/* 2. Educational & Gateway Information (Horizontal 3-Column Grid) */}
       <div className="w-full">

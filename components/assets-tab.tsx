@@ -19,8 +19,8 @@ import { useRouter } from 'next/navigation';
 
 const ALLOC_COLORS = ['#16ffbb', '#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#6366f1', '#14b8a6'];
 
-export const AssetsTab = ({ onDepositClick }: { onDepositClick?: () => void }) => {
-  const { tokens, fiat, rateUsdToVnd, hasAssets, hasNoAssets, getVisibleTokens, pubkey, refreshBalances, setActiveSection } = useWalletStore();
+export const AssetsTab = ({ onDepositClick, hideWalletCard = false, compact = false }: { onDepositClick?: () => void; hideWalletCard?: boolean; compact?: boolean }) => {
+  const { tokens, fiat, rateUsdToVnd, hasAssets, hasNoAssets, getVisibleTokens, pubkey, refreshBalances, setActiveSection, activity } = useWalletStore();
   const router = useRouter();
   const [showBalance, setShowBalance] = useState(true);
   const [selectedToken, setSelectedToken] = useState<TokenHolding | null>(null);
@@ -116,7 +116,7 @@ export const AssetsTab = ({ onDepositClick }: { onDepositClick?: () => void }) =
     <div className='space-y-6'>
 
       {/* ─── Wallet Card (Main Wallet Card in place of Total Net Worth) ─── */}
-      {!loading && !error && !isNoAssets && (
+      {!loading && !error && !isNoAssets && !hideWalletCard && (
         <div className="space-y-4">
           <WalletBanner onDepositClick={onDepositClick} />
         </div>
@@ -195,7 +195,7 @@ export const AssetsTab = ({ onDepositClick }: { onDepositClick?: () => void }) =
 
           {!loading && !error && !isNoAssets && (
             <div className="divide-y divide-border/10">
-              {visibleTokens.map((token) => {
+              {(compact ? visibleTokens.slice(0, 2) : visibleTokens).map((token) => {
                 const jupiterToken = tokenData.get(token.symbol);
                 const effectivePriceUsd = jupiterToken?.usdPrice ?? token.priceUsd ?? 0;
                 const value = token.amount * effectivePriceUsd;
@@ -254,29 +254,34 @@ export const AssetsTab = ({ onDepositClick }: { onDepositClick?: () => void }) =
                   </motion.div>
                 );
               })}
+
+              {/* Compact: See more link */}
+              {compact && visibleTokens.length > 2 && (
+                <button
+                  onClick={() => setActiveSection('send')}
+                  className="w-full py-3 text-center text-xs font-bold text-primary hover:text-primary/80 hover:bg-white/[0.02] transition-colors cursor-pointer"
+                >
+                  See all {visibleTokens.length} holdings →
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Quick Trade Button */}
-      {!loading && !error && !isNoAssets && (
-        <div className="flex justify-center pt-1">
-          <Button
-            size="sm"
-            onClick={() => router.push('/buy')}
-            className="px-5 h-9 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-primary to-accent hover:opacity-90 shadow-md shadow-primary/10 border-0 transition-all flex items-center gap-1.5"
-          >
-            <ArrowLeftRight className="h-3.5 w-3.5" />
-            Quick Swap Aggregator
-          </Button>
-        </div>
-      )}
 
       {/* ─── Activity Section ─── */}
       <div className="space-y-3 pt-2">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Recent Activity</h3>
-        <AssetsActivity />
+        <AssetsActivity maxItems={compact ? 2 : 20} />
+        {compact && (activity?.length || 0) > 2 && (
+          <button
+            onClick={() => setActiveSection('send')}
+            className="w-full py-2.5 text-center text-xs font-bold text-primary hover:text-primary/80 transition-colors cursor-pointer rounded-xl border border-border/20 hover:border-primary/20 bg-card/30 hover:bg-card/50"
+          >
+            See all activity →
+          </button>
+        )}
       </div>
 
       {/* Token Detail Modal */}

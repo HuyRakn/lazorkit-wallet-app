@@ -3,82 +3,8 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
 
-// Simulated real-time posts feed generator
-let simulationInterval = null;
-
-const simulatedUsers = [
-  'HuyR8sN2K9sd7x1k9aPq7uKyT8x9z2aB',
-  'Alex9sD2K9sd7x1k9aPq7uKyT8x9z2aC',
-  'SolD8sN2K9sd7x1k9aPq7uKyT8x9z2aD',
-  'DeFi9sN2K9sd7x1k9aPq7uKyT8x9z2aE',
-  'Whal8sN2K9sd7x1k9aPq7uKyT8x9z2aF',
-  'Meme9sN2K9sd7x1k9aPq7uKyT8x9z2aG',
-  'DevN8sN2K9sd7x1k9aPq7uKyT8x9z2aH',
-  'Node9sN2K9sd7x1k9aPq7uKyT8x9z2aI',
-];
-
-const simulatedContents = [
-  "Just swapped 50 SOL for USDC on Jupiter. Price impact is extremely low today!",
-  "LazorKit MPC wallet integration was so smooth. Highly recommend checking out the passkey security.",
-  "Solana Devnet transactions are incredibly fast, ping is currently under 300ms!",
-  "Orca CLMM pools are printing fees today. Yield is crazy.",
-  "A new cNFT collection just dropped on Tensor. Minting now!",
-  "Solana Mobile Seeker looks like a game changer for dApp store accessibility.",
-  "Just deployed a new anchor program on Devnet. Works flawlessly!",
-  "Whale alert: 50,000 SOL transferred from Unknown Wallet to Binance.",
-  "Jito staking rewards just hit. Compounding immediately.",
-  "Pyth network feeds are extremely accurate. Best oracle in the space.",
-  "Checking out the new RampFi portal. The dual-column layout is gorgeous!",
-  "Solana Gas fees are still practically zero. Ethereum devs are missing out.",
-  "Jupiter LFG launchpad is getting crowded. Lots of exciting projects coming up.",
-  "Just minted my first compressed NFT on Solana. Gas fee was only 0.00001 SOL!",
-  "Solana network stability has been 100% for the last 6 months. Bullish!",
-  "Liquid staking on Solana with Marinade (mSOL) is super simple. 8% APY!",
-  "Send transaction of 1,000 USDC completed in 2.3 seconds on Devnet.",
-  "Checking out Orca whirlpools. Concentrated liquidity is awesome.",
-  "Raydium V4 pools are seeing huge volume today.",
-  "Anyone else tracking the new SPL token standards? Extensions are huge.",
-];
-
-const startSimulatedFeed = () => {
-  if (simulationInterval) return;
-
-  console.log('🚀 Starting real-time feed simulation...');
-  simulationInterval = setInterval(async () => {
-    try {
-      if (mongoose.connection.readyState !== 1) {
-        return; // Only execute if MongoDB is connected
-      }
-
-      const randomUser = simulatedUsers[Math.floor(Math.random() * simulatedUsers.length)];
-      const randomContent = simulatedContents[Math.floor(Math.random() * simulatedContents.length)];
-      
-      const newPost = new Post({
-        walletAddress: randomUser,
-        content: randomContent,
-        type: 'user',
-        likes: [],
-        comments: []
-      });
-
-      await newPost.save();
-      console.log('🌱 Simulated a new real-time post:', randomContent.slice(0, 35) + '...');
-      
-      // Keep DB clean: if posts count > 100, delete oldest
-      const count = await Post.countDocuments();
-      if (count > 100) {
-        const oldest = await Post.find().sort({ createdAt: 1 }).limit(count - 100);
-        const ids = oldest.map(p => p._id);
-        await Post.deleteMany({ _id: { $in: ids } });
-      }
-    } catch (err) {
-      console.error('Failed to run feed simulation step:', err);
-    }
-  }, 10000); // Create a post every 10 seconds
-};
-
-// Start simulation on import
-startSimulatedFeed();
+// No simulated feed — all posts are real user-generated content only
+// Posts are created via the POST / endpoint by authenticated wallet users
 
 // Get feed posts (with pagination)
 router.get('/', async (req, res) => {

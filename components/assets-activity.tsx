@@ -42,7 +42,7 @@ function getActivityMeta(kind: ActivityKind) {
 
 type FilterType = 'all' | 'send' | 'receive' | 'swap';
 
-export function AssetsActivity() {
+export function AssetsActivity({ maxItems = 20 }: { maxItems?: number } = {}) {
   const { activity, fetchTransactionHistory, pubkey } = useWalletStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -152,7 +152,7 @@ export function AssetsActivity() {
             />
           ) : (
             <ul className='divide-y divide-border/30'>
-              {filteredActivity.slice(0, 20).map((a) => {
+              {filteredActivity.slice(0, maxItems).map((a) => {
                 const meta = getActivityMeta(a.kind);
                 const Icon = meta.icon;
                 const status = (a as any).status || 'Success';

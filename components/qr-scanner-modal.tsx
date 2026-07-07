@@ -2,17 +2,15 @@
 
 import { useState, useRef, useEffect } from 'react';
 import QrScannerLib from 'qr-scanner';
+import { Button } from './ui/button';
+import { ViewportModal } from './ui/viewport-modal';
+import { Camera, AlertCircle, Upload, Download, Image as ImageIcon } from 'lucide-react';
+import QRCode from 'qrcode';
 
-// Ensure the Web Worker is available for live decoding (faster and more reliable)
-// Use a pinned CDN path to avoid bundler path resolution issues
-// Note: You can move the worker file into /public and point to it if preferred
+// Ensure the Web Worker is available for live decoding
 if (typeof window !== 'undefined' && (QrScannerLib as any).WORKER_PATH == null) {
   (QrScannerLib as any).WORKER_PATH = 'https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js';
 }
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { X, Camera, AlertCircle, Upload, Download, Image as ImageIcon } from 'lucide-react';
-import QRCode from 'qrcode';
 
 interface QRScannerModalProps {
   open: boolean;
@@ -36,10 +34,8 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
     const setupScanner = async () => {
       if (!open || activeTab !== 'scan') return;
       try {
-        // Reset single-shot flag each time modal opens scan tab
         hasScannedRef.current = false;
 
-        // Basic capability check
         const hasCamera = await QrScannerLib.hasCamera();
         if (!hasCamera) {
           setHasPermission(false);
@@ -47,15 +43,12 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
           return;
         }
 
-        // Probe permission first
         await navigator.mediaDevices.getUserMedia({ video: true });
         if (!isMounted) return;
         setHasPermission(true);
         setError(null);
 
-        // Initialize QrScanner on our own video element
         if (videoRef.current) {
-          // Stop any previous scanner
           try { await scannerRef.current?.stop(); } catch {}
           scannerRef.current?.destroy?.();
           scannerRef.current = new QrScannerLib(
@@ -66,7 +59,6 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
               if (hasScannedRef.current) return;
               hasScannedRef.current = true;
               try {
-                // Stop scanning immediately to avoid duplicate submissions
                 await scannerRef.current?.stop();
               } catch {}
               onOpenChange(false);
@@ -81,7 +73,6 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
             }
           );
 
-          // Improve detection in dark or inverted codes
           try { (scannerRef.current as any)?.setInversionMode?.('both'); } catch {}
           await scannerRef.current.start();
         }
@@ -97,14 +88,11 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
 
     return () => {
       isMounted = false;
-      // Cleanup scanner on unmount or tab close/switch
       try { scannerRef.current?.stop(); } catch {}
       scannerRef.current?.destroy?.();
       scannerRef.current = null;
     };
   }, [open, activeTab, onQRScanned]);
-
-  // Live scanner now handled by QrScannerLib; keep only image upload path below
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -114,17 +102,13 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
       setError(null);
       setIsProcessing(true);
       
-      // Read the file as data URL
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const imageDataUrl = e.target?.result as string;
-          
-          // Use QrScanner to decode the QR code from the image
           const result = await QrScannerLib.scanImage(imageDataUrl);
           
           if (result) {
-            // Forward raw string to parent; backend will validate
             onQRScanned(result as string);
             onOpenChange(false);
           } else {
@@ -154,7 +138,7 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
         margin: 2,
         color: {
           dark: '#16ffbb',
-          light: '#000000'
+          light: '#0c0c0e'
         }
       });
       
@@ -168,153 +152,149 @@ export const QRScannerModal = ({ open, onOpenChange, onQRScanned }: QRScannerMod
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md bg-gradient-to-br from-gray-900 to-gray-800 border-gray-700">
-        <CardHeader className="flex flex-row items-center justify-between border-b border-gray-700">
-          <CardTitle className="text-lg text-white">QR Code Scanner</CardTitle>
+    <ViewportModal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="QR Code Scanner"
+      className="max-w-md"
+    >
+      <div className="p-6 space-y-5">
+        {/* Tab Navigation with unified glass pill styles */}
+        <div className="flex space-x-1.5 bg-slate-900 border border-white/5 rounded-xl p-1">
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => onOpenChange(false)}
-            className="hover:bg-gray-700 text-gray-300"
+            size="sm"
+            onClick={() => setActiveTab('scan')}
+            className={`flex-1 h-9 rounded-lg font-bold text-xs transition-all ${
+              activeTab === 'scan' 
+                ? 'bg-primary/20 text-primary border border-primary/25 shadow-sm' 
+                : 'text-muted-foreground hover:text-white hover:bg-white/5'
+            }`}
           >
-            <X className="h-4 w-4" />
+            <Camera className="h-4 w-4 mr-2" />
+            Scan QR
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4 p-6">
-          {/* Tab Navigation */}
-          <div className="flex space-x-2 bg-gray-800 rounded-lg p-1">
-            <Button
-              variant={activeTab === 'scan' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveTab('scan')}
-              className={`flex-1 ${activeTab === 'scan' 
-                ? 'bg-[#16ffbb] text-black hover:bg-[#16ffbb]/90' 
-                : 'text-gray-300 hover:text-white hover:bg-gray-700'
-              }`}
-            >
-              <Camera className="h-4 w-4 mr-2" />
-              Scan
-            </Button>
-            <Button
-              variant={activeTab === 'upload' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveTab('upload')}
-              className={`flex-1 ${activeTab === 'upload' 
-                ? 'bg-[#16ffbb] text-black hover:bg-[#16ffbb]/90' 
-                : 'text-gray-300 hover:text-white hover:bg-gray-700'
-              }`}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveTab('upload')}
+            className={`flex-1 h-9 rounded-lg font-bold text-xs transition-all ${
+              activeTab === 'upload' 
+                ? 'bg-primary/20 text-primary border border-primary/25 shadow-sm' 
+                : 'text-muted-foreground hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload File
+          </Button>
+        </div>
 
-          {activeTab === 'scan' ? (
-            <>
-              {hasPermission === false ? (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                  <p className="text-red-300 mb-4">{error}</p>
-                  <Button 
-                    onClick={() => onOpenChange(false)}
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                  >
-                    Close
-                  </Button>
-                </div>
-              ) : hasPermission === true ? (
-                <div className="space-y-4">
-                  <div className="relative w-full h-64 bg-gray-800 rounded-lg overflow-hidden border border-[#16ffbb]/30">
-                    <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-                    {/* Laser line effect */}
-                    <div className="absolute left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-[#16ffbb] to-transparent shadow-[0_0_8px_#16ffbb] pointer-events-none animate-laser" />
-                    {/* Soft grid overlay in scanner area */}
-                    <div className="absolute inset-0 border border-[#16ffbb]/40 rounded-lg pointer-events-none"></div>
-                  </div>
-                  {error && (
-                    <div className="text-center text-red-300 text-sm bg-red-900/20 rounded-lg p-3">
-                      {error}
-                    </div>
-                  )}
-                  <p className="text-center text-sm text-gray-300">
-                    Point your camera at the QR code from the new device
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Camera className="h-12 w-12 text-[#16ffbb] mx-auto mb-4 animate-pulse" />
-                  <p className="text-gray-300">Requesting camera permission...</p>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-center py-8">
-                <ImageIcon className="h-12 w-12 text-[#16ffbb] mx-auto mb-4" />
-                <p className="text-gray-300 mb-4">Upload QR Code Image</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={isProcessing}
-                />
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-[#16ffbb] hover:bg-[#16ffbb]/90 text-black"
-                  disabled={isProcessing}
+        {/* Dynamic Scan vs Upload area */}
+        {activeTab === 'scan' ? (
+          <>
+            {hasPermission === false ? (
+              <div className="text-center py-10 bg-slate-900/40 rounded-2xl border border-white/5 p-5 space-y-4">
+                <AlertCircle className="h-10 w-10 text-rose-500 mx-auto" />
+                <p className="text-rose-300 text-xs font-mono">{error}</p>
+                <Button 
+                  onClick={() => onOpenChange(false)}
+                  className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs font-bold rounded-xl"
                 >
-                  {isProcessing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black mr-2"></div>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose Image
-                    </>
-                  )}
+                  Close
                 </Button>
-                {isProcessing && (
-                  <p className="text-gray-400 text-sm mt-2">
-                    Reading QR code from image...
-                  </p>
-                )}
               </div>
-              {error && (
-                <div className="text-center text-red-300 text-sm bg-red-900/20 rounded-lg p-3">
-                  {error}
+            ) : hasPermission === true ? (
+              <div className="space-y-4">
+                <div className="relative w-full h-64 bg-slate-950 rounded-2xl overflow-hidden border border-white/10 shadow-inner flex items-center justify-center">
+                  <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+                  {/* Neon scan laser effect */}
+                  <div className="absolute left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_12px_#16ffbb] pointer-events-none animate-laser" />
+                  {/* Subtle target box */}
+                  <div className="absolute w-44 h-44 border-2 border-primary/30 rounded-xl pointer-events-none flex items-center justify-center">
+                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl" />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr" />
+                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl" />
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br" />
+                  </div>
                 </div>
-              )}
+                {error && (
+                  <div className="text-center text-rose-300 text-xs font-mono bg-rose-950/20 border border-rose-500/20 rounded-xl p-3">
+                    {error}
+                  </div>
+                )}
+                <p className="text-center text-xs text-muted-foreground font-mono">
+                  Point camera at the QR code to scan.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-16 bg-slate-900/40 border border-white/5 rounded-2xl space-y-4">
+                <Camera className="h-10 w-10 text-primary mx-auto animate-pulse" />
+                <p className="text-muted-foreground text-xs font-mono">Requesting camera permissions...</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-4">
+            <div className="text-center py-12 bg-slate-900/40 border border-white/5 rounded-2xl space-y-4">
+              <ImageIcon className="h-10 w-10 text-primary mx-auto" />
+              <div>
+                <p className="text-white text-sm font-bold">Select QR Code Image</p>
+                <p className="text-muted-foreground text-[10px] mt-1">PNG, JPG, or SVG formats supported</p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={isProcessing}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-primary text-slate-950 hover:bg-primary/90 font-extrabold rounded-xl shadow-lg shadow-primary/10"
+                disabled={isProcessing}
+              >
+                {isProcessing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-950 mr-2"></div>
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Browse Image
+                  </>
+                )}
+              </Button>
             </div>
-          )}
-
-          {/* Save QR Button */}
-          <div className="pt-4 border-t border-gray-700">
-            <Button
-              onClick={() => {
-                const sampleQRData = JSON.stringify({
-                  type: 'device_import',
-                  shareId: 'sample_' + Date.now(),
-                  timestamp: new Date().toISOString()
-                });
-                saveQRImage(sampleQRData);
-              }}
-              variant="outline"
-              className="w-full border-[#16ffbb]/50 text-[#16ffbb] hover:bg-[#16ffbb]/10"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Save Sample QR Code
-            </Button>
+            {error && (
+              <div className="text-center text-rose-300 text-xs font-mono bg-rose-950/20 border border-rose-500/20 rounded-xl p-3">
+                {error}
+              </div>
+            )}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        )}
+
+        {/* Save QR Button */}
+        <div className="pt-4 border-t border-white/5">
+          <Button
+            onClick={() => {
+              const sampleQRData = JSON.stringify({
+                type: 'device_import',
+                shareId: 'sample_' + Date.now(),
+                timestamp: new Date().toISOString()
+              });
+              saveQRImage(sampleQRData);
+            }}
+            variant="outline"
+            className="w-full border-primary/30 hover:border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 font-bold rounded-xl"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Save Sample QR Code
+          </Button>
+        </div>
+      </div>
+    </ViewportModal>
   );
 };

@@ -17,14 +17,14 @@ export const SearchBar = ({
   className,
 }: SearchBarProps) => {
   return (
-    <div className={`relative ${className}`}>
-      <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
-      <Input
-        type='text'
+    <div className={`relative w-full ${className}`}>
+      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-primary" />
+      <input
+        type="text"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className='pl-10'
+        className="w-full h-12 pl-12 pr-4 bg-slate-950/60 hover:bg-slate-950/80 focus:bg-slate-950 border border-white/5 hover:border-white/15 focus:border-primary/50 text-white rounded-xl placeholder:text-muted-foreground/60 text-sm focus:outline-none transition-all duration-300 shadow-lg shadow-black/20 focus:shadow-primary/5"
       />
     </div>
   );

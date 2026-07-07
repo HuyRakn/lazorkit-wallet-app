@@ -17,12 +17,8 @@ export const Pagination = ({
   currentPage,
   totalPages,
   onPageChange,
-  onLoadMore,
-  isLoading,
   className,
-}: PaginationProps) => {
-  const showLoadMore = currentPage < totalPages;
-
+}: Omit<PaginationProps, 'onLoadMore' | 'isLoading'>) => {
   return (
     <div className={`flex flex-col items-center space-y-4 ${className}`}>
       {/* Page Numbers */}
@@ -37,7 +33,7 @@ export const Pagination = ({
           <ChevronLeft className='h-4 w-4' />
         </Button>
 
-        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+        {Array.from({ length: totalPages }, (_, i) => {
           const page = i + 1;
           return (
             <Button
@@ -62,18 +58,6 @@ export const Pagination = ({
           <ChevronRight className='h-4 w-4' />
         </Button>
       </div>
-
-      {/* Load More Button */}
-      {showLoadMore && (
-        <Button
-          variant='outline'
-          onClick={onLoadMore}
-          disabled={isLoading}
-          className='w-full'
-        >
-          {isLoading ? t('common.loading') : t('apps.loadMore')}
-        </Button>
-      )}
     </div>
   );
 };

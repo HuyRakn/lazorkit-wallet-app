@@ -61,7 +61,7 @@ export const ViewportModal = ({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className={cn(
-            'fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm',
+            'fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md',
             'flex items-center justify-center',
             'p-4', // Add padding for mobile
             overlayClassName
@@ -69,32 +69,32 @@ export const ViewportModal = ({
           onClick={() => onOpenChange(false)}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{
               type: 'spring',
-              damping: 25,
-              stiffness: 300,
+              damping: 28,
+              stiffness: 350,
             }}
             className={cn(
-              'bg-background relative w-full max-w-md max-h-[85vh]',
-              'rounded-xl border shadow-2xl',
-              'flex flex-col', // Make it a flex container
+              'bg-slate-950/80 backdrop-blur-2xl relative w-full max-w-md max-h-[85vh]',
+              'rounded-2xl border border-white/10 shadow-[0_0_50px_rgba(22,255,187,0.1)]',
+              'flex flex-col overflow-hidden', // Make it a flex container
               className
             )}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
             {title && (
-              <div className="flex items-center justify-between p-6 pb-4 border-b">
-                <h2 className="text-xl font-semibold">{title}</h2>
+              <div className="flex items-center justify-between p-6 pb-4 border-b border-white/5 bg-slate-950/20">
+                <h2 className="text-lg font-bold tracking-tight text-white">{title}</h2>
                 {showCloseButton && (
                   <button
                     onClick={() => onOpenChange(false)}
-                    className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition focus:outline-none focus:ring-1 focus:ring-primary"
                   >
-                    <XIcon className="h-5 w-5" />
+                    <XIcon className="h-4 w-4" />
                     <span className="sr-only">Close</span>
                   </button>
                 )}
@@ -102,7 +102,7 @@ export const ViewportModal = ({
             )}
 
             {/* Content - No scroll, compact layout */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
               {children}
             </div>
           </motion.div>

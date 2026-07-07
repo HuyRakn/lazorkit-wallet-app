@@ -40,7 +40,7 @@ export interface AppCard {
   id: string;
   name: string;
   intro: string;
-  category: 'DeFi' | 'Social' | 'Games' | 'Tools';
+  category: 'DeFi' | 'Social' | 'Games' | 'Tools' | 'NFT';
   tags: string[];
   image: string;
   website: string;
@@ -49,6 +49,7 @@ export interface AppCard {
   installs?: string;
   updatedAt?: string;
   version?: string;
+  banner?: string;
 }
 
 export interface Activity {

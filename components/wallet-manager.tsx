@@ -133,8 +133,17 @@ export const WalletManager = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
+      // Disconnect SDK first to prevent WalletSync auto-restore
+      if (disconnect && typeof disconnect === 'function') {
+        try {
+          await disconnect();
+        } catch (sdkErr) {
+          console.warn('SDK disconnect failed (non-fatal):', sdkErr);
+        }
+      }
+      
       logout();
       toast({
         title: t('notifications.logoutSuccess'),
