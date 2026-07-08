@@ -480,7 +480,7 @@ router.post('/callback/success', async (req, res, next) => {
         // Resolve the ACTUAL PDA smart wallet from chain using multiple strategies
         const lazorkitProgramId = (() => {
           try {
-            const c = sdk.getLazorkitClient();
+            const c = client;
             return c?.programId?.toBase58?.() || c?.programId?.toString?.() || null;
           } catch { return null; }
         })();
@@ -610,6 +610,85 @@ router.post('/callback/failed', async (req, res, next) => {
     await order.save();
     return res.json({ ok: true });
   } catch (err) { return next(err); }
+});
+
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const cacheFilePath = path.join(__dirname, '../utils/exchange-rate-cache.json');
+
+function fetchExchangeRateFromApi(apiKey) {
+  return new Promise((resolve, reject) => {
+    const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/USD`;
+    https.get(url, (response) => {
+      let data = '';
+      response.on('data', (chunk) => { data += chunk; });
+      response.on('end', () => {
+        try {
+          if (response.statusCode === 200) {
+            const parsed = JSON.parse(data);
+            if (parsed && parsed.result === 'success' && parsed.conversion_rates && parsed.conversion_rates.VND) {
+              resolve(parsed.conversion_rates.VND);
+            } else {
+              reject(new Error('Invalid response data structure'));
+            }
+          } else {
+            reject(new Error(`API status ${response.statusCode}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+router.get('/exchange-rate', async (req, res, next) => {
+  try {
+    let cachedData = null;
+    let needsUpdate = true;
+
+    if (fs.existsSync(cacheFilePath)) {
+      try {
+        const rawCache = fs.readFileSync(cacheFilePath, 'utf8');
+        cachedData = JSON.parse(rawCache);
+        const lastUpdated = new Date(cachedData.timestamp);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        if (lastUpdated > thirtyDaysAgo && cachedData.rate) {
+          needsUpdate = false;
+        }
+      } catch {
+        needsUpdate = true;
+      }
+    }
+
+    if (needsUpdate) {
+      const apiKey = process.env.NEXT_PUBLIC_EXCHANGE_RATE_API_KEY || '2412cc7adfb37b20d15d1d86';
+      try {
+        const rate = await fetchExchangeRateFromApi(apiKey);
+        cachedData = {
+          rate: Number(rate),
+          timestamp: new Date().toISOString()
+        };
+        const cacheDir = path.dirname(cacheFilePath);
+        if (!fs.existsSync(cacheDir)) {
+          fs.mkdirSync(cacheDir, { recursive: true });
+        }
+        fs.writeFileSync(cacheFilePath, JSON.stringify(cachedData, null, 2), 'utf8');
+        return res.json({ rate: cachedData.rate, source: 'api' });
+      } catch (err) {
+        if (cachedData && cachedData.rate) {
+          return res.json({ rate: cachedData.rate, source: 'cache_fallback' });
+        }
+        return res.json({ rate: 26000, source: 'fallback' });
+      }
+    }
+
+    return res.json({ rate: cachedData.rate, source: 'cache' });
+  } catch (err) {
+    return next(err);
+  }
 });
 
 router.get('/:reference', async (req, res, next) => {

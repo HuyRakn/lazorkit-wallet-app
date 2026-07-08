@@ -89,7 +89,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   const amountUsd =
     fromCurrency === 'USD'
       ? amountNum
-      : convertCurrency(amountNum, 'VND', 'USD', 27000);
+      : convertCurrency(amountNum, 'VND', 'USD', rateUsdToVnd);
 
   const tokenJupiterData = tokenData?.get(toToken);
   // Use Jupiter live price data → fallback to known stablecoin prices → zero
@@ -212,7 +212,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
   };
 
   const handleQuickAmountClick = (usdAmount: number) => {
-    const fiatAmount = fromCurrency === 'USD' ? usdAmount : usdAmount * 27000;
+    const fiatAmount = fromCurrency === 'USD' ? usdAmount : usdAmount * rateUsdToVnd;
     setAmount(fiatAmount.toString());
     setSelectedQuickAmount(usdAmount);
     setError('');
@@ -275,7 +275,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 <div className='text-xs text-muted-foreground mt-0.5 font-medium'>
                   {fromCurrency === 'VND'
                     ? `≈ ${amountUsd.toFixed(2)}`
-                    : `≈ ${(amountNum * 27000).toLocaleString()} ₫`}
+                    : `≈ ${(amountNum * rateUsdToVnd).toLocaleString()} ₫`}
                 </div>
               </div>
             </div>
@@ -327,7 +327,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
                 selectedQuickAmount === usdAmount &&
                 (fromCurrency === 'USD'
                   ? amountNum === usdAmount
-                  : Math.abs(amountNum - usdAmount * 27000) < 1);
+                  : Math.abs(amountNum - usdAmount * rateUsdToVnd) < 1);
 
               return (
                 <button
@@ -365,7 +365,7 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
 
         <div className='text-center mt-2.5'>
           <div className='text-[10px] text-muted-foreground'>
-            {t('onRamp.exchangeRate')}: 1 USD = 27,000 VND
+            {t('onRamp.exchangeRate')}: 1 USD = {rateUsdToVnd.toLocaleString()} VND
           </div>
         </div>
       </div>

@@ -103,6 +103,8 @@ export interface WalletState {
   setWalletName: (name: string) => void;
   setTokenAmount?: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => void;
   setFiat: (fiat: Fiat) => void;
+  setRateUsdToVnd: (rate: number) => void;
+  fetchExchangeRate: () => Promise<void>;
   recordOnrampPurchase: (
     amount: number,
     fiat: Fiat,
@@ -256,6 +258,21 @@ export const useWalletStore = create<WalletState>()(
         },
         setWalletName: (name: string) => set({ walletName: name }),
         setFiat: (fiat) => set({ fiat }),
+        setRateUsdToVnd: (rateUsdToVnd) => set({ rateUsdToVnd }),
+        fetchExchangeRate: async () => {
+          try {
+            const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:3001';
+            const response = await fetch(`${apiBase}/api/orders/exchange-rate`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data && typeof data.rate === 'number') {
+                set({ rateUsdToVnd: data.rate });
+              }
+            }
+          } catch (error) {
+            console.error('Failed to fetch exchange rate:', error);
+          }
+        },
         setTokenAmount: (symbol: TokenSym, amount: number, priceUsdOverride?: number) => {
           const state = get();
           const idx = state.tokens.findIndex((t) => t.symbol === symbol);
@@ -345,6 +362,7 @@ export const useWalletStore = create<WalletState>()(
 
           try {
             console.log('🔄 Refreshing balances on-chain for:', state.pubkey);
+            get().fetchExchangeRate().catch(console.error);
             const tokenHoldings = await fetchRealTokenData(state.pubkey, defaultConnection);
             console.log('✅ Refreshed balances:', tokenHoldings);
             set({ tokens: tokenHoldings });

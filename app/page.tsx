@@ -61,6 +61,7 @@ export default function HomePage() {
     const loadTokens = async () => {
       try {
         setLoadingTokens(true);
+        useWalletStore.getState().fetchExchangeRate?.().catch(console.error);
         const tokens = await fetchCommonTokens();
         setTokenData(tokens);
         if (hasWallet && pubkey && refreshBalances) {
