@@ -10,8 +10,8 @@ import {
   AppCard,
   Activity,
 } from '@/lib/types';
-import { 
-  getTokenBalance, 
+import {
+  getTokenBalance,
   getAllTokenBalances,
   getSwapQuote,
   getSwapTransaction,
@@ -118,12 +118,12 @@ export interface WalletState {
   refreshBalances: () => Promise<void>;
   getRealTokenBalance: (tokenMint: string) => Promise<number>;
   fetchTransactionHistory: () => Promise<void>;
-  
+
   // Logout and reset functions
   logout: () => void;
   resetPasskey: () => void;
   resetWallet: () => void;
-  
+
   // Navigation State
   activeSection: string;
   setActiveSection: (section: string) => void;
@@ -155,9 +155,9 @@ const createSafeStorage = (): Storage => {
     // Return a no-op storage for SSR that implements the Storage interface
     return {
       getItem: () => null,
-      setItem: () => {},
-      removeItem: () => {},
-      clear: () => {},
+      setItem: () => { },
+      removeItem: () => { },
+      clear: () => { },
       get length() { return 0; },
       key: () => null,
     } as Storage;
@@ -181,7 +181,7 @@ const checkStorageIntegrity = () => {
         localStorage.removeItem(storageKey);
       }
     }
-  } catch {}
+  } catch { }
 };
 
 export const useWalletStore = create<WalletState>()(
@@ -299,7 +299,7 @@ export const useWalletStore = create<WalletState>()(
 
         recordOnrampPurchase: (amount, fiat, token, orderId) => {
           const state = get();
-          
+
           const tokenIndex = state.tokens.findIndex((t) => t.symbol === token);
           const next = [...state.tokens];
           if (tokenIndex >= 0) {
@@ -415,7 +415,7 @@ export const useWalletStore = create<WalletState>()(
           try {
             const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
             const toMint = (TOKEN_ADDRESSES as Record<string, string>)[toToken];
-            
+
             if (!fromMint || !toMint) {
               console.error('Invalid token addresses:', { fromToken, toToken, fromMint, toMint });
               return false;
@@ -461,7 +461,7 @@ export const useWalletStore = create<WalletState>()(
             };
           } catch (error) {
             console.error('Error preparing swap:', error);
-            
+
             // Record failed swap activity
             const failedActivity: Activity = {
               id: Date.now().toString(),
@@ -473,7 +473,7 @@ export const useWalletStore = create<WalletState>()(
               status: 'Failed',
             };
             set({ activity: [failedActivity, ...get().activity] });
-            
+
             return false;
           }
         },
@@ -502,9 +502,11 @@ export const useWalletStore = create<WalletState>()(
             const newActivities = chainActivities.filter(a => !existingIds.has(a.id));
 
             if (newActivities.length > 0) {
-              set({ activity: [...newActivities, ...state.activity].sort((a, b) => 
-                new Date(b.ts).getTime() - new Date(a.ts).getTime()
-              )});
+              set({
+                activity: [...newActivities, ...state.activity].sort((a, b) =>
+                  new Date(b.ts).getTime() - new Date(a.ts).getTime()
+                )
+              });
             }
           } catch (error) {
             console.warn('Failed to fetch transaction history:', error);
@@ -520,20 +522,20 @@ export const useWalletStore = create<WalletState>()(
             tokens: [],
             activity: []
           });
-          
+
           // Set explicit logout flag to prevent WalletSync from auto-restoring
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('lazorkit-explicit-logout', 'true');
-              
+
               // Clear passkey and session data
               localStorage.removeItem('lazorkit-passkey-data');
               localStorage.removeItem('lz_last_ref');
-              
+
               // Clear SDK internal session keys
               localStorage.removeItem('lazorkit-smart-wallet-id-devnet');
               localStorage.removeItem('lazorkit-smart-wallet-id-mainnet');
-              
+
               // Clear any other lazorkit-* keys the SDK may have set
               const keysToRemove: string[] = [];
               for (let i = 0; i < localStorage.length; i++) {
@@ -543,14 +545,14 @@ export const useWalletStore = create<WalletState>()(
                 }
               }
               keysToRemove.forEach(key => localStorage.removeItem(key));
-              
+
               // Also clear the persisted zustand store to prevent stale hasWallet=true
               localStorage.removeItem('lazorkit-wallet-storage');
             } catch (e) {
               console.warn('Failed to clear localStorage:', e);
             }
           }
-          
+
           // Redirect to root after logout
           if (typeof window !== 'undefined') {
             window.location.href = '/';
@@ -559,7 +561,7 @@ export const useWalletStore = create<WalletState>()(
 
         resetPasskey: () => {
           set({ hasPasskey: false });
-          
+
           // Xóa passkeyData khỏi localStorage khi reset passkey
           if (typeof window !== 'undefined') {
             try {
@@ -569,7 +571,7 @@ export const useWalletStore = create<WalletState>()(
               console.warn('Failed to clear localStorage:', e);
             }
           }
-          
+
         },
 
         resetWallet: () => {
@@ -580,7 +582,7 @@ export const useWalletStore = create<WalletState>()(
             tokens: [],
             activity: []
           });
-          
+
           // Xóa passkeyData khỏi localStorage khi reset wallet
           if (typeof window !== 'undefined') {
             try {
@@ -590,7 +592,7 @@ export const useWalletStore = create<WalletState>()(
               console.warn('Failed to clear localStorage:', e);
             }
           }
-          
+
         },
       };
     },

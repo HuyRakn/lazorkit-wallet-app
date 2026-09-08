@@ -4,8 +4,7 @@ const orderSchema = new mongoose.Schema({
   reference: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   provider: {
     type: String,
@@ -54,7 +53,6 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Index for faster queries
-orderSchema.index({ reference: 1 });
 orderSchema.index({ status: 1 });
 // Không dùng TTL để tránh mất dữ liệu; cron sẽ chuyển trạng thái sang failed
 orderSchema.index({ expiresAt: 1 });

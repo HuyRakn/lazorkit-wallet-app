@@ -65,7 +65,7 @@ export async function fetchLivePrices(): Promise<Record<string, LiveTokenPrice>>
     // 1. Fetch Solana tokens from DexScreener API
     const solanaMints = Object.values(MAINNET_MINTS).join(',');
     const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${solanaMints}`);
-    
+
     // 2. Fetch BTC, ETH, and other non-Solana tokens from Jupiter Price API
     const jupIds = 'BTC,ETH';
     const jupResponse = await fetch(`https://api.jup.ag/price/v2?ids=${jupIds}`);
@@ -76,16 +76,16 @@ export async function fetchLivePrices(): Promise<Record<string, LiveTokenPrice>>
     if (dexResponse.ok) {
       const dexJson = await dexResponse.json();
       const pairs = dexJson.pairs || [];
-      
+
       // Update tokens with the best liquidity pair from DexScreener
       for (const [symbol, mint] of Object.entries(MAINNET_MINTS)) {
         const tokenPairs = pairs.filter((p: any) => p.baseToken?.address === mint);
         if (tokenPairs.length > 0) {
           // Sort by liquidity or volume desc to get the main pool
-          const bestPool = tokenPairs.sort((a: any, b: any) => 
+          const bestPool = tokenPairs.sort((a: any, b: any) =>
             (b.volume?.h24 || 0) - (a.volume?.h24 || 0)
           )[0];
-          
+
           if (bestPool) {
             result[symbol] = {
               symbol,

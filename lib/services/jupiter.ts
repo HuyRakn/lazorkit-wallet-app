@@ -112,7 +112,7 @@ export async function fetchTokenData(
   // Rate limiting
   const lastRequest = lastRequestTime.get(cacheKey) || 0;
   const timeSinceLastRequest = Date.now() - lastRequest;
-  
+
   if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
     await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest));
   }
@@ -192,7 +192,7 @@ export async function fetchTokenData(
 
   // Add to request queue
   requestQueue.set(cacheKey, requestPromise);
-  
+
   return await requestPromise;
 }
 
@@ -240,7 +240,7 @@ export async function getSwapQuote(
 
     const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
     const url = `${backendBase}/api/jupiter/quote?inputMint=${encodeURIComponent(inputMint)}&outputMint=${encodeURIComponent(outputMint)}&amount=${amount}&slippageBps=${slippageBps}`;
-    
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
     const response = await fetch(url, {
@@ -255,7 +255,7 @@ export async function getSwapQuote(
     }
 
     const data = await response.json();
-    
+
     // Validate response data structure
     if (!data || typeof data !== 'object') {
       console.warn('Invalid response from Jupiter API:', data);
@@ -345,8 +345,8 @@ export async function getTokenBalance(
         return balance || 0;
       } catch (mintError: any) {
         // Handle specific mint errors
-        if (mintError.message?.includes('could not find mint') || 
-            mintError.message?.includes('Token mint could not be unpacked')) {
+        if (mintError.message?.includes('could not find mint') ||
+          mintError.message?.includes('Token mint could not be unpacked')) {
           console.warn(`Token mint ${tokenMint} not found on devnet, returning 0 balance`);
           return 0;
         }
@@ -360,7 +360,7 @@ export async function getTokenBalance(
       await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
       return 0; // Return 0 for now, will retry later
     }
-    
+
     console.error('Error getting token balance:', error);
     return 0;
   }
