@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWalletStore } from '@/lib/store/wallet';
+import { useRealtimeBalances } from '@/hooks/use-realtime-balances';
 import { SidebarNav } from '@/components/sidebar-nav';
 import { BottomNav } from '@/components/bottom-nav';
 import { WalletCardMini } from '@/components/wallet-card-mini';
@@ -12,6 +13,7 @@ import { AssetsTab } from '@/components/assets-tab';
 import { DevicesTab } from '@/components/devices-tab';
 import { SettingsTab } from '@/components/settings-tab';
 import { NftCreatorView } from '@/components/nft-creator-view';
+import { StakingTab } from '@/components/staking-tab';
 import { UnifiedTradeForm } from '@/components/UnifiedTradeForm';
 import { CryptoFeed } from '@/components/feed/crypto-feed';
 import { AppHeader } from '@/components/app-header';
@@ -20,22 +22,49 @@ import { WalletBanner } from '@/components/wallet-banner';
 import { SendModalViewport } from '@/components/send-modal-viewport';
 import { DepositModalCompact } from '@/components/deposit-modal-compact';
 import { ConnectWalletModal } from '@/components/connect-wallet-modal';
+import { CommandPalette } from '@/components/command-palette';
 import { AuthRequiredView } from '@/components/auth-required-view';
 import { LandingPage } from '@/components/landing-page';
 import { TransactionHistoryWidget } from '@/components/transaction-history-widget';
 import { fetchCommonTokens, JupiterToken, defaultConnection } from '@/lib/services/jupiter';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/loading-skeleton';
-import { Sparkles, MessageSquare, Newspaper, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Blockie } from '@/components/ui/blockie';
+import { toast } from '@/hooks/use-toast';
+import {
+  ChevronLeft,
+  Search,
+  Send as SendIcon,
+  QrCode,
+  Copy,
+  Zap,
+  ArrowUpRight,
+  ArrowDownLeft,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const SECTION_META: Record<string, { title: string; badge: string }> = {
+  home: { title: 'Dashboard & Live Feed', badge: 'Real-Time' },
+  market: { title: 'Market Hub', badge: 'Analytics' },
+  buy: { title: 'Buy & Swap Studio', badge: 'Raydium CPMM' },
+  send: { title: 'Transfers & Portfolio', badge: 'Gasless' },
+  stake: { title: 'Native SOL Staking', badge: '~6.8% APY' },
+  apps: { title: 'Solana Ecosystem', badge: 'Verified' },
+  nft: { title: 'NFT & cNFT Studio', badge: 'Metaplex' },
+  devices: { title: 'Security & Session Keys', badge: 'Passkey P-256' },
+  settings: { title: 'Preferences', badge: 'System' },
+};
 
 export default function HomePage() {
   const router = useRouter();
   const { hasWallet, pubkey, refreshBalances, activeSection, setActiveSection } = useWalletStore();
+  // Websocket-driven balance/history refresh for the connected wallet
+  useRealtimeBalances(hasWallet ? pubkey : null);
 
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const mainContainerRef = React.useRef<HTMLDivElement>(null);
@@ -178,33 +207,51 @@ export default function HomePage() {
         return (
           <div className="space-y-6 animate-page-enter">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">Send & Receive Assets</h2>
-              <p className="text-sm text-muted-foreground">Transfer assets safely on Solana or display your QR code to receive.</p>
+              <h2 className="text-2xl font-bold tracking-tight text-foreground">Send &amp; Receive Assets</h2>
+              <p className="text-sm text-muted-foreground">Transfer assets gas-free on Solana Devnet or generate a Solana Pay QR code.</p>
             </div>
             {/* Quick Action Cards */}
             <div className="grid sm:grid-cols-2 gap-4">
-              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
+              <motion.div whileHover={{ scale: 1.015, y: -2 }} whileTap={{ scale: 0.985 }}>
                 <Card
                   onClick={() => setSendModalOpen(true)}
-                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition text-center space-y-3"
+                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition flex items-center gap-4 text-left"
                 >
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/20 flex items-center justify-center mx-auto">
-                    <MessageSquare className="h-6 w-6 text-primary" />
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/30 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(22,255,187,0.12)]">
+                    <ArrowUpRight className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="text-sm font-bold text-foreground">Send Tokens</h3>
-                  <p className="text-xs text-muted-foreground">Send tokens gas-free using a Solana address.</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-extrabold text-white">Send Tokens</h3>
+                      <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[9px] font-extrabold uppercase tracking-wider">
+                        0 Gas
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Instant SOL &amp; rUSDC transfers signed with Passkey or Quick Pay session.
+                    </p>
+                  </div>
                 </Card>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02, y: -2 }} whileTap={{ scale: 0.98 }}>
+              <motion.div whileHover={{ scale: 1.015, y: -2 }} whileTap={{ scale: 0.985 }}>
                 <Card
                   onClick={() => setDepositModalOpen(true)}
-                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition text-center space-y-3"
+                  className="p-6 premium-depth-card rounded-2xl cursor-pointer transition flex items-center gap-4 text-left"
                 >
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-emerald-500/15 to-primary/10 border border-emerald-500/20 flex items-center justify-center mx-auto">
-                    <Star className="h-6 w-6 text-emerald-400" />
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-primary/10 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(16,185,129,0.12)]">
+                    <ArrowDownLeft className="h-6 w-6 text-emerald-400" />
                   </div>
-                  <h3 className="text-sm font-bold text-foreground">Receive Tokens</h3>
-                  <p className="text-xs text-muted-foreground">Display your public address and QR code to receive funds.</p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-extrabold text-white">Receive &amp; Solana Pay</h3>
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-extrabold uppercase tracking-wider">
+                        QR Link
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Display your Smart Vault QR code or request a specific payment amount.
+                    </p>
+                  </div>
                 </Card>
               </motion.div>
             </div>
@@ -226,6 +273,9 @@ export default function HomePage() {
 
       case 'nft':
         return <NftCreatorView />;
+
+      case 'stake':
+        return <StakingTab />;
 
       case 'devices':
         return <DevicesTab />;
@@ -294,16 +344,90 @@ export default function HomePage() {
         </div>
 
         {/* Center Main Scroll View (Cột 2) */}
-        <main ref={mainContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-0">
+        <main ref={mainContainerRef} className="flex-1 overflow-y-auto pb-24 md:pb-0 flex flex-col">
+          {/* 2026 Operational Control Bar (Desktop & Tablet) */}
+          <header className="sticky top-0 z-30 liquid-glass-bar px-4 md:px-8 h-14 flex items-center justify-between gap-4 shrink-0">
+            {/* Left: Section Breadcrumb */}
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="text-sm font-extrabold text-white tracking-tight truncate">
+                {SECTION_META[activeSection]?.title || 'Workspace'}
+              </span>
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20 text-primary text-[10px] font-extrabold uppercase tracking-wider">
+                {SECTION_META[activeSection]?.badge || 'Live'}
+              </span>
+            </div>
 
-          <div className={`px-4 py-6 md:px-8 ${activeSection === 'settings' ? 'md:py-2' : 'md:py-6'} w-full max-w-[1360px] mx-auto`}>
+            {/* Center: Universal ⌘K Command Trigger */}
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className="hidden md:flex items-center justify-between gap-3 w-full max-w-xs lg:max-w-sm h-9 px-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-primary/30 text-xs text-muted-foreground hover:text-white transition-all cursor-pointer group"
+            >
+              <span className="flex items-center gap-2 truncate">
+                <Search className="h-3.5 w-3.5 text-primary/80 group-hover:text-primary transition-colors" />
+                <span>Search actions, swap, faucet, or jump…</span>
+              </span>
+              <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] font-mono font-bold text-white/70 shrink-0">
+                ⌘K
+              </kbd>
+            </button>
+
+            {/* Right: Telemetry, Quick Actions & Smart Vault Chip */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="hidden xl:block">
+                <SolanaNetworkWidget />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSendModalOpen(true)}
+                className="h-8 px-2.5 rounded-lg premium-depth-btn-secondary text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                title="Gasless Send"
+              >
+                <SendIcon className="h-3 w-3 text-primary" />
+                <span className="hidden sm:inline">Send</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDepositModalOpen(true)}
+                className="h-8 px-2.5 rounded-lg premium-depth-btn-secondary text-[11px] font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                title="Receive & Solana Pay QR"
+              >
+                <QrCode className="h-3 w-3 text-emerald-400" />
+                <span className="hidden sm:inline">Receive</span>
+              </button>
+
+              {pubkey && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(pubkey);
+                    toast({ title: 'Smart Vault Address Copied', description: pubkey });
+                  }}
+                  className="h-8 pl-1.5 pr-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 hover:border-primary/30 inline-flex items-center gap-2 transition-all cursor-pointer"
+                  title="Click to copy Smart Vault PDA"
+                >
+                  <div className="w-5 h-5 rounded-md overflow-hidden border border-primary/30 shrink-0">
+                    <Blockie seed={pubkey} size={8} scale={3} />
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-white/90">
+                    {pubkey.slice(0, 4)}…{pubkey.slice(-4)}
+                  </span>
+                  <Copy className="h-3 w-3 text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          </header>
+
+          <div className={`px-4 py-6 md:px-8 ${activeSection === 'settings' ? 'md:py-4' : 'md:py-6'} w-full max-w-[1360px] mx-auto flex-1`}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeSection}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15, ease: 'easeInOut' }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               >
                 {renderCenterView()}
               </motion.div>
@@ -316,6 +440,15 @@ export default function HomePage() {
       <BottomNav
         activeSection={activeSection}
         onSectionChange={setActiveSection}
+      />
+
+      {/* Universal ⌘K Command Palette */}
+      <CommandPalette
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        onSectionChange={setActiveSection}
+        onSendClick={() => setSendModalOpen(true)}
+        onDepositClick={() => setDepositModalOpen(true)}
       />
 
       {/* Unified Send Modal */}

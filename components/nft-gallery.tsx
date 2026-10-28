@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWalletStore } from '@/lib/store/wallet';
-import { ExternalLink, Image as ImageIcon, RefreshCw, Layers, Sparkles, X } from 'lucide-react';
+import { useWallet } from '@/hooks/use-lazorkit-wallet';
+import { ExternalLink, Image as ImageIcon, RefreshCw, Layers, Hexagon, PlusCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface NftAsset {
@@ -37,67 +38,63 @@ interface NftGalleryProps {
 
 export function NftGallery({ onMintClick }: NftGalleryProps) {
   const { pubkey } = useWalletStore();
+  const lz = useWallet();
+  const activeAddress = lz.address || pubkey;
   const [assets, setAssets] = useState<NftAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedNft, setSelectedNft] = useState<NftAsset | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const rpcUrl = process.env.NEXT_PUBLIC_LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
+  const rpcUrl = process.env.NEXT_PUBLIC_DAS_RPC_URL || process.env.NEXT_PUBLIC_LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
 
   const fetchNfts = useCallback(async (isSilent = false) => {
-    if (!pubkey) return;
+    if (!activeAddress) return;
 
     try {
       if (!isSilent) setLoading(true);
       else setRefreshing(true);
       setError(null);
 
-      const response = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 'rampfi-nft-gallery',
-          method: 'getAssetsByOwner',
-          params: {
-            ownerAddress: pubkey,
-            page: 1,
-            limit: 100,
-            displayOptions: {
-              showCollectionMetadata: true,
-              showUnverifiedCollections: true,
+      let items: NftAsset[] = [];
+
+      try {
+        const response = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'rampfi-nft-gallery',
+            method: 'getAssetsByOwner',
+            params: {
+              ownerAddress: activeAddress,
+              page: 1,
+              limit: 100,
+              displayOptions: {
+                showCollectionMetadata: true,
+                showUnverifiedCollections: true,
+              },
             },
-          },
-        }),
-      });
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`RPC request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        // If DAS API is not available (e.g., standard Solana RPC), show helpful message
-        if (data.error.message?.includes('Method not found')) {
-          setError('NFT Gallery requires Helius RPC. Please configure NEXT_PUBLIC_LAZORKIT_RPC_URL with your Helius endpoint.');
-          return;
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.error && data.result?.items) {
+            items = data.result.items.filter((item: any) => {
+              return item.interface === 'V1_NFT' || 
+                     item.interface === 'ProgrammableNFT' ||
+                     item.interface === 'V1_PRINT' ||
+                     item.compression?.compressed === true;
+            });
+          }
         }
-        throw new Error(data.error.message || 'RPC error');
+      } catch (dasErr) {
+        console.warn('DAS query skipped/failed, trying on-chain token accounts:', dasErr);
       }
-
-      const items: NftAsset[] = (data.result?.items || []).filter((item: any) => {
-        // Filter to only NFTs (not fungible tokens)
-        const isNft = item.interface === 'V1_NFT' || 
-                      item.interface === 'ProgrammableNFT' ||
-                      item.interface === 'V1_PRINT' ||
-                      item.compression?.compressed === true;
-        return isNft;
-      });
 
       setAssets(items);
-      console.log(`🖼️ NFT Gallery: Found ${items.length} NFTs for ${pubkey.slice(0, 8)}...`);
+      console.log(`🖼️ NFT Gallery: Found ${items.length} NFTs for ${activeAddress.slice(0, 8)}...`);
     } catch (err) {
       console.error('NFT Gallery fetch error:', err);
       setError((err as Error).message || 'Failed to load NFTs');
@@ -105,7 +102,7 @@ export function NftGallery({ onMintClick }: NftGalleryProps) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [pubkey, rpcUrl]);
+  }, [activeAddress, rpcUrl]);
 
   useEffect(() => {
     fetchNfts();
@@ -185,7 +182,7 @@ export function NftGallery({ onMintClick }: NftGalleryProps) {
       {!loading && !error && assets.length === 0 && (
         <div className="text-center py-16 space-y-5 border border-dashed border-border/60 rounded-2xl">
           <div className="w-16 h-16 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-center mx-auto">
-            <Sparkles className="h-8 w-8 text-primary/40" />
+            <Hexagon className="h-8 w-8 text-primary/40" />
           </div>
           <div className="space-y-1.5">
             <p className="text-sm font-bold text-foreground">No NFTs Found</p>
@@ -198,7 +195,7 @@ export function NftGallery({ onMintClick }: NftGalleryProps) {
               onClick={onMintClick}
               className="bg-primary text-primary-foreground font-bold text-xs rounded-xl px-6 hover:bg-primary/90"
             >
-              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
               Mint Your First NFT
             </Button>
           )}

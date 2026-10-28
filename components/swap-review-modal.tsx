@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { AlertCircle, Zap, Shield, Loader2, ArrowDown, CheckCircle2, Clock, ExternalLink, Route } from 'lucide-react';
+import { AlertCircle, Zap, Shield, Loader2, ArrowDown, CheckCircle2, ExternalLink, Route } from 'lucide-react';
 import { TokenLogo } from './ui/token-logo';
+import { explorerTxUrl } from '@/lib/utils/explorer';
 
 interface SwapReviewModalProps {
   open: boolean;
@@ -19,11 +20,16 @@ interface SwapReviewModalProps {
     inAmount: string;
     outputMint: string;
     outAmount: string;
-    priceImpactPct?: string;
+    priceImpactPct?: string | number;
     routePlan?: any[];
     otherAmountThreshold?: string;
+    dex?: string;
+    minOutAmount?: string;
+    outDecimals?: number;
+    feeRatePct?: number;
   };
-  onConfirm: () => Promise<void> | void;
+  /** Resolves with the transaction signature once the swap lands on-chain. */
+  onConfirm: () => Promise<string | void> | string | void;
 }
 
 /** Countdown hook for quote expiry */
@@ -35,7 +41,7 @@ function useCountdown(seconds: number, enabled: boolean) {
     if (!enabled) return;
     setRemaining(seconds);
     intervalRef.current = setInterval(() => {
-      setRemaining(prev => {
+      setRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(intervalRef.current!);
           return 0;
@@ -43,19 +49,29 @@ function useCountdown(seconds: number, enabled: boolean) {
         return prev - 1;
       });
     }, 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [seconds, enabled]);
 
   return remaining;
 }
 
-export function SwapReviewModal({ open, onOpenChange, fromToken, toToken, amount, estimatedReceive, fee, quote, onConfirm }: SwapReviewModalProps) {
+export function SwapReviewModal({
+  open,
+  onOpenChange,
+  fromToken,
+  toToken,
+  amount,
+  estimatedReceive,
+  quote,
+  onConfirm,
+}: SwapReviewModalProps) {
   const [isExecuting, setIsExecuting] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
   const countdown = useCountdown(30, open && !isExecuting && !txSignature);
 
-  // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setTxSignature(null);
@@ -67,7 +83,8 @@ export function SwapReviewModal({ open, onOpenChange, fromToken, toToken, amount
     setIsExecuting(true);
     setTxError(null);
     try {
-      await onConfirm();
+      const signature = await onConfirm();
+      if (typeof signature === 'string') setTxSignature(signature);
     } catch (err: any) {
       setTxError(err?.message || 'Transaction failed');
     } finally {
@@ -75,191 +92,239 @@ export function SwapReviewModal({ open, onOpenChange, fromToken, toToken, amount
     }
   };
 
-  const priceImpact = parseFloat(quote?.priceImpactPct || '0');
+  const priceImpact = Number(quote?.priceImpactPct ?? 0) || 0;
   const priceImpactLevel = priceImpact > 3 ? 'high' : priceImpact > 1 ? 'medium' : 'low';
-  const routeHops = quote?.routePlan?.length || 0;
+  const isRaydium = quote?.dex === 'raydium-cpmm';
 
-  // Extract route names from Jupiter routePlan
-  const routeLabels = quote?.routePlan?.map((hop: any) => {
-    const swap = hop?.swapInfo;
-    return swap?.label || swap?.ammKey?.slice(0, 6) || 'Pool';
-  }) || [];
+  const routeLabels: string[] = isRaydium
+    ? ['Raydium CPMM']
+    : quote?.routePlan?.map((hop: any) => {
+        const swap = hop?.swapInfo;
+        return swap?.label || swap?.ammKey?.slice(0, 6) || 'Pool';
+      }) || [];
+  const routeHops = routeLabels.length;
+  const minReceived =
+    quote?.minOutAmount && quote.outDecimals != null
+      ? Number(quote.minOutAmount) / 10 ** quote.outDecimals
+      : null;
 
   const rate = amount > 0 ? estimatedReceive / amount : 0;
 
   return (
     <Dialog open={open} onOpenChange={(v) => !isExecuting && onOpenChange(v)}>
-      <DialogContent className="sm:max-w-md gradient-border-card border-0 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border border-white/12 bg-[#0b0d15]/95 backdrop-blur-2xl flex flex-col max-h-[88vh]">
+        {/* Top Accent Line */}
+        <div className="h-[2px] w-full bg-gradient-to-r from-primary via-accent to-purple-500 shrink-0" />
+
         {/* Header */}
-        <div className="px-6 pt-6 pb-3">
+        <div className="px-5 pt-4 pb-3 border-b border-white/[0.06] shrink-0">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold flex items-center gap-2">
-              Review Swap
+            <DialogTitle className="text-base font-extrabold flex items-center gap-2.5 text-white">
+              <span>Review Swap</span>
               {countdown > 0 && !isExecuting && !txSignature && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">
                   {countdown}s
                 </span>
               )}
+              <span className="ml-auto mr-7 text-[10px] font-bold px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                {isRaydium ? 'Raydium CPMM' : 'Devnet'}
+              </span>
             </DialogTitle>
           </DialogHeader>
         </div>
 
-        <div className="px-6 pb-6 space-y-4">
-          {/* ── Transaction Simulation Preview ── */}
+        {/* Scrollable Body */}
+        <div className="px-5 py-4 space-y-3.5 overflow-y-auto custom-scrollbar flex-1">
+          {/* Spend / Receive Stack */}
           <div className="space-y-0">
-            <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              This transaction will:
-            </div>
-
             {/* FROM — Spend */}
-            <div className="flex items-center justify-between p-3 rounded-t-xl bg-red-500/5 border border-red-500/10">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-muted/30 flex items-center justify-center">
-                  <TokenLogo symbol={fromToken} size={32} />
+            <div className="flex items-center justify-between p-3 rounded-t-xl bg-rose-500/[0.06] border border-rose-500/15">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-black/40 border border-white/10 flex items-center justify-center shrink-0">
+                  <TokenLogo symbol={fromToken} size={28} />
                 </div>
                 <div>
-                  <div className="text-xs text-red-400 font-semibold">▼ Spend</div>
-                  <div className="text-sm font-bold text-foreground">{amount.toFixed(6)} {fromToken}</div>
+                  <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">▼ You Pay</div>
+                  <div className="text-sm font-extrabold text-white font-mono">
+                    {amount.toFixed(6)} {fromToken}
+                  </div>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">from your wallet</div>
+              <span className="text-[10px] font-semibold text-muted-foreground bg-white/[0.03] px-2 py-0.5 rounded border border-white/5">
+                Wallet
+              </span>
             </div>
 
-            {/* Arrow */}
-            <div className="flex justify-center -my-1.5 relative z-10">
-              <div className="w-7 h-7 rounded-full bg-card border border-border flex items-center justify-center">
-                <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
+            {/* Arrow Divider */}
+            <div className="flex justify-center -my-2 relative z-10">
+              <div className="w-6 h-6 rounded-full bg-[#111522] border border-white/15 flex items-center justify-center shadow-md">
+                <ArrowDown className="w-3 h-3 text-primary" />
               </div>
             </div>
 
             {/* TO — Receive */}
-            <div className="flex items-center justify-between p-3 rounded-b-xl bg-emerald-500/5 border border-emerald-500/10">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-muted/30 flex items-center justify-center">
-                  <TokenLogo symbol={toToken} size={32} />
+            <div className="flex items-center justify-between p-3 rounded-b-xl bg-emerald-500/[0.06] border border-emerald-500/15">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-black/40 border border-white/10 flex items-center justify-center shrink-0">
+                  <TokenLogo symbol={toToken} size={28} />
                 </div>
                 <div>
-                  <div className="text-xs text-emerald-400 font-semibold">▲ Receive</div>
-                  <div className="text-sm font-bold text-foreground">~{estimatedReceive.toFixed(6)} {toToken}</div>
+                  <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">▲ You Receive</div>
+                  <div className="text-sm font-extrabold text-white font-mono">
+                    ~{estimatedReceive.toFixed(6)} {toToken}
+                  </div>
                 </div>
               </div>
-              <div className="text-xs text-muted-foreground">estimated</div>
+              <span className="text-[10px] font-semibold text-emerald-400/90 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Estimated
+              </span>
             </div>
           </div>
 
-          {/* ── Route Visualization ── */}
+          {/* Swap Route Pill */}
           {routeHops > 0 && (
-            <div className="p-3 rounded-xl bg-muted/10 border border-border/40 space-y-2">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                <Route className="w-3 h-3" />
-                Swap Route
-              </div>
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-semibold">{fromToken}</span>
+            <div className="px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.07] flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider shrink-0">
+                <Route className="w-3 h-3 text-primary" />
+                Route
+              </span>
+              <div className="flex items-center gap-1 flex-wrap justify-end">
+                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold">
+                  {fromToken}
+                </span>
                 {routeLabels.map((label: string, i: number) => (
                   <span key={i} className="flex items-center gap-1">
-                    <span className="text-muted-foreground text-xs">→</span>
-                    <span className="px-2 py-0.5 rounded-md bg-muted/20 text-muted-foreground text-[10px] font-medium border border-border/30">
+                    <span className="text-muted-foreground text-[10px]">→</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 text-white/80 text-[10px] font-medium border border-white/10">
                       {label}
                     </span>
                   </span>
                 ))}
-                <span className="text-muted-foreground text-xs">→</span>
-                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-xs font-semibold">{toToken}</span>
+                <span className="text-muted-foreground text-[10px]">→</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold">
+                  {toToken}
+                </span>
               </div>
             </div>
           )}
 
-          {/* ── Details Grid ── */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center text-xs py-1">
-              <span className="text-muted-foreground">Rate</span>
-              <span className="font-mono text-foreground">1 {fromToken} = {rate.toFixed(6)} {toToken}</span>
+          {/* Compact Details Box */}
+          <div className="p-3 rounded-xl premium-depth-inset space-y-1.5 text-xs">
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Exchange Rate</span>
+              <span className="font-mono font-semibold text-white">
+                1 {fromToken} = {rate.toFixed(6)} {toToken}
+              </span>
             </div>
 
-            {quote && (
-              <div className="flex justify-between items-center text-xs py-1">
-                <span className="text-muted-foreground">Price Impact</span>
-                <span className={`font-semibold ${
-                  priceImpactLevel === 'high' ? 'text-red-400' : 
-                  priceImpactLevel === 'medium' ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {priceImpact.toFixed(2)}%
-                  {priceImpactLevel === 'high' && ' ⚠️'}
+            {minReceived != null && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Minimum Received</span>
+                <span className="font-mono font-semibold text-white">
+                  {minReceived.toFixed(6)} {toToken}
                 </span>
               </div>
             )}
 
-            <div className="flex justify-between items-center text-xs py-1">
-              <span className="text-muted-foreground">Network Fee</span>
-              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+            {quote && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Price Impact</span>
+                <span
+                  className={`font-mono font-bold ${
+                    priceImpactLevel === 'high'
+                      ? 'text-rose-400'
+                      : priceImpactLevel === 'medium'
+                      ? 'text-amber-400'
+                      : 'text-emerald-400'
+                  }`}
+                >
+                  {priceImpact.toFixed(2)}%{priceImpactLevel === 'high' && ' ⚠️'}
+                </span>
+              </div>
+            )}
+
+            {quote?.feeRatePct != null && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">LP Pool Fee</span>
+                <span className="font-mono text-white/90">{quote.feeRatePct}%</span>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Network Gas</span>
+              <span className="flex items-center gap-1 text-emerald-400 font-bold">
                 <Zap className="w-3 h-3" />
                 Sponsored (Free)
               </span>
             </div>
-
-            <div className="flex justify-between items-center text-xs py-1">
-              <span className="text-muted-foreground">Route</span>
-              <span className="text-foreground">{routeHops > 0 ? `${routeHops} hop${routeHops > 1 ? 's' : ''}` : 'Direct'}</span>
-            </div>
           </div>
 
-          {/* ── Price Impact Warning ── */}
+          {/* Price Impact Warning (only when elevated) */}
           {priceImpactLevel !== 'low' && (
-            <div className={`flex items-start gap-2 p-3 rounded-xl text-xs ${
-              priceImpactLevel === 'high' 
-                ? 'bg-red-500/10 border border-red-500/20 text-red-300' 
-                : 'bg-amber-500/5 border border-amber-500/20 text-amber-300'
-            }`}>
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <p>
-                <strong>Price Impact Warning:</strong> This swap has a {priceImpact.toFixed(2)}% price impact. 
-                {priceImpactLevel === 'high' ? ' Consider splitting into smaller orders.' : ' Proceed with caution.'}
-              </p>
+            <div
+              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] ${
+                priceImpactLevel === 'high'
+                  ? 'bg-rose-500/10 border border-rose-500/20 text-rose-300'
+                  : 'bg-amber-500/10 border border-amber-500/20 text-amber-300'
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                <strong>Price Impact ({priceImpact.toFixed(2)}%):</strong>{' '}
+                {priceImpactLevel === 'high' ? 'Consider smaller trade size.' : 'Pool reserve impact on Devnet.'}
+              </span>
             </div>
           )}
 
-          {/* ── Devnet Notice ── */}
-          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 text-amber-300 text-xs">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <p>
-              <strong>Devnet:</strong> Jupiter pricing from Mainnet. 
-              On Devnet, the transaction will be simulated if liquidity pools are unavailable.
-            </p>
-          </div>
+          {/* On-Chain Result or Error */}
+          {txSignature && (
+            <a
+              href={explorerTxUrl(txSignature)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between gap-2 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold hover:bg-emerald-500/20 transition"
+            >
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Swap confirmed on-chain
+              </span>
+              <span className="flex items-center gap-1 font-mono text-[11px]">
+                {txSignature.slice(0, 8)}… <ExternalLink className="w-3 h-3" />
+              </span>
+            </a>
+          )}
 
-          {/* ── Security Footer ── */}
-          <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground/60 font-medium">
-            <span className="flex items-center gap-1">
-              <Shield className="h-3 w-3 text-primary/60" />
-              Passkey Signed
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Zap className="h-3 w-3 text-emerald-400/60" />
-              Jupiter API
-            </span>
-            <span>•</span>
-            <span>Solana Devnet</span>
-          </div>
+          {txError && (
+            <div className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="break-words">{txError}</p>
+            </div>
+          )}
+        </div>
 
-          {/* ── Confirm Button ── */}
-          <Button 
-            className={`w-full h-12 font-bold rounded-xl transition-all shadow-lg ${
-              countdown === 0 && !isExecuting
-                ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20'
+        {/* Sticky Footer with Confirm Button */}
+        <div className="px-5 pt-3 pb-4 border-t border-white/[0.06] bg-black/20 space-y-2.5 shrink-0">
+          <Button
+            className={`w-full h-11 font-extrabold rounded-xl transition-all text-xs uppercase tracking-wider ${
+              countdown === 0 && !isExecuting && !txSignature
+                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                : 'premium-depth-btn'
             }`}
-            onClick={countdown === 0 && !isExecuting ? () => onOpenChange(false) : handleConfirm}
+            onClick={
+              txSignature || (countdown === 0 && !isExecuting)
+                ? () => onOpenChange(false)
+                : handleConfirm
+            }
             disabled={isExecuting}
           >
             {isExecuting ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Signing via Passkey...</span>
+                <span>Signing with Passkey...</span>
               </div>
+            ) : txSignature ? (
+              <span>Done</span>
             ) : countdown === 0 ? (
-              <span>Quote Expired — Close</span>
+              <span>Quote Expired — Refresh</span>
             ) : (
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
@@ -267,6 +332,20 @@ export function SwapReviewModal({ open, onOpenChange, fromToken, toToken, amount
               </div>
             )}
           </Button>
+
+          <div className="flex items-center justify-center gap-2.5 text-[10px] text-muted-foreground/70 font-medium">
+            <span className="flex items-center gap-1">
+              <Shield className="h-3 w-3 text-primary/70" />
+              Passkey P-256
+            </span>
+            <span>•</span>
+            <span className="flex items-center gap-1">
+              <Zap className="h-3 w-3 text-emerald-400/70" />
+              {isRaydium ? 'Raydium CPMM Pool' : 'Jupiter Route'}
+            </span>
+            <span>•</span>
+            <span>Solana Devnet</span>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

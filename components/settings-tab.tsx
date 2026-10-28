@@ -201,58 +201,61 @@ export const SettingsTab = () => {
       )}
 
       {/* ── Main Settings Grid ── */}
-      <div className='grid grid-cols-1 lg:grid-cols-2 content-start gap-3 pb-2 items-stretch'>
+      <div className='grid grid-cols-1 lg:grid-cols-2 content-start gap-4 pb-4 items-stretch'>
 
         {/* Card 1: Preferences */}
-        <div className='rounded-2xl overflow-visible border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm flex flex-col justify-between relative z-20'>
-          <div>
-            <div className='flex items-center gap-2 px-4 pt-3 pb-2'>
-              <div className='w-7 h-7 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center'>
-                <Globe className='h-3.5 w-3.5 text-primary' />
+        <div className='rounded-2xl overflow-visible border border-white/10 premium-depth-card flex flex-col justify-between relative z-20 p-5 space-y-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2.5'>
+              <div className='w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center'>
+                <Globe className='h-4 w-4 text-primary' />
               </div>
-              <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted-foreground'>Preferences</h3>
+              <div>
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-foreground'>Preferences</h3>
+                <p className='text-[10px] text-muted-foreground'>Regional & display configuration</p>
+              </div>
             </div>
+          </div>
 
-            <div className='divide-y divide-border/20'>
-              {/* Language */}
-              <div className='px-4 py-2 hover:bg-white/[0.02] transition-colors'>
-                <div className='flex items-center justify-between gap-4'>
-                  <div className='flex-1 min-w-0'>
-                    <Label className='text-xs font-bold text-foreground'>{t('settings.language')}</Label>
-                    <p className='text-[11px] text-muted-foreground mt-0.5'>Choose display language</p>
-                  </div>
-                  <div className='w-28 shrink-0'>
-                    <SimpleSelect
-                      value={language}
-                      onValueChange={handleLanguageChange}
-                      options={[
-                        { value: 'en', label: '🇺🇸 English' },
-                        { value: 'vi', label: '🇻🇳 Tiếng Việt' },
-                      ]}
-                      className='h-8 bg-background/50 border-border/50 text-xs rounded-xl'
-                    />
-                  </div>
+          <div className='divide-y divide-white/5 rounded-xl border border-white/5 bg-black/20'>
+            {/* Language */}
+            <div className='px-4 py-3 hover:bg-white/[0.02] transition-colors'>
+              <div className='flex items-center justify-between gap-4'>
+                <div className='flex-1 min-w-0'>
+                  <Label className='text-xs font-bold text-foreground'>{t('settings.language')}</Label>
+                  <p className='text-[11px] text-muted-foreground mt-0.5'>Interface localization</p>
+                </div>
+                <div className='w-36 shrink-0'>
+                  <SimpleSelect
+                    value={language}
+                    onValueChange={handleLanguageChange}
+                    options={[
+                      { value: 'en', label: 'EN — English' },
+                      { value: 'vi', label: 'VI — Tiếng Việt' },
+                    ]}
+                    className='h-8 bg-background/60 border-white/10 text-xs rounded-xl font-semibold'
+                  />
                 </div>
               </div>
+            </div>
 
-              {/* Currency */}
-              <div className='px-4 py-2 rounded-b-2xl hover:bg-white/[0.02] transition-colors'>
-                <div className='flex items-center justify-between gap-4'>
-                  <div className='flex-1 min-w-0'>
-                    <Label className='text-xs font-bold text-foreground'>{t('settings.currency')}</Label>
-                    <p className='text-[11px] text-muted-foreground mt-0.5'>Default fiat currency</p>
-                  </div>
-                  <div className='w-28 shrink-0'>
-                    <SimpleSelect
-                      value={fiat}
-                      onValueChange={handleCurrencyChange}
-                      options={[
-                        { value: 'USD', label: '💵 USD' },
-                        { value: 'VND', label: '🇻🇳 VND' },
-                      ]}
-                      className='h-8 bg-background/50 border-border/50 text-xs rounded-xl'
-                    />
-                  </div>
+            {/* Currency */}
+            <div className='px-4 py-3 rounded-b-xl hover:bg-white/[0.02] transition-colors'>
+              <div className='flex items-center justify-between gap-4'>
+                <div className='flex-1 min-w-0'>
+                  <Label className='text-xs font-bold text-foreground'>{t('settings.currency')}</Label>
+                  <p className='text-[11px] text-muted-foreground mt-0.5'>Default fiat valuation</p>
+                </div>
+                <div className='w-36 shrink-0'>
+                  <SimpleSelect
+                    value={fiat}
+                    onValueChange={handleCurrencyChange}
+                    options={[
+                      { value: 'USD', label: 'USD ($)' },
+                      { value: 'VND', label: 'VND (₫)' },
+                    ]}
+                    className='h-8 bg-background/60 border-white/10 text-xs rounded-xl font-semibold'
+                  />
                 </div>
               </div>
             </div>
@@ -260,180 +263,154 @@ export const SettingsTab = () => {
         </div>
 
         {/* Card 2: Network */}
-        <div className='rounded-2xl overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm flex flex-col justify-between relative z-10'>
-          <div>
-            <div className='flex items-center gap-2 px-4 pt-3 pb-2'>
-              <div className='w-7 h-7 rounded-xl bg-sky-500/10 border border-sky-500/15 flex items-center justify-center'>
-                <Wifi className='h-3.5 w-3.5 text-sky-400' />
+        <div className='rounded-2xl overflow-hidden border border-white/10 premium-depth-card flex flex-col justify-between relative z-10 p-5 space-y-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2.5'>
+              <div className='w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center'>
+                <Wifi className='h-4 w-4 text-sky-400' />
               </div>
-              <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted-foreground'>Network</h3>
-              {rpcStatus === 'online' && (
-                <div className='ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/15'>
-                  <span className='w-1 h-1 rounded-full bg-emerald-400 animate-pulse' />
-                  <span className='text-[9px] font-bold text-emerald-400'>Live</span>
-                </div>
-              )}
+              <div>
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-foreground'>Network & RPC</h3>
+                <p className='text-[10px] text-muted-foreground'>High-throughput Solana cluster</p>
+              </div>
             </div>
-            
-            <div className='divide-y divide-border/20'>
-              {/* RPC */}
-              <div className='px-4 py-2'>
-                <div className='flex items-center justify-between'>
-                  <div className='min-w-0'>
-                    <span className='text-xs font-bold text-foreground block'>RPC Endpoint</span>
-                    <span className='text-[11px] text-muted-foreground font-mono truncate block max-w-[200px] mt-0.5'>{rpcHost}</span>
-                  </div>
-                  {rpcStatus === 'checking' ? (
-                    <div className='w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin' />
-                  ) : rpcStatus === 'online' ? (
-                    <div className='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/15'>
-                      <Zap className='h-3 w-3 text-emerald-400' />
-                      <span className='text-xs font-bold text-emerald-400 font-mono'>{rpcLatency}ms</span>
-                    </div>
-                  ) : (
-                    <div className='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20'>
-                      <WifiOff className='h-3 w-3 text-rose-400' />
-                      <span className='text-xs font-bold text-rose-400'>Offline</span>
-                    </div>
-                  )}
-                </div>
+            {rpcStatus === 'online' && (
+              <div className='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20'>
+                <span className='w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse' />
+                <span className='text-[10px] font-bold text-emerald-400 uppercase tracking-wider'>Connected</span>
               </div>
-              {/* Active Network */}
-              <div className='px-4 py-2'>
-                <div className='flex items-center justify-between'>
-                  <div>
-                    <span className='text-xs font-bold text-foreground block'>Active Network</span>
-                    <span className='text-[11px] text-muted-foreground mt-0.5'>Solana Devnet</span>
-                  </div>
-                  <span className='text-[9px] font-bold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/15'>
-                    Devnet
-                  </span>
+            )}
+          </div>
+
+          <div className='divide-y divide-white/5 rounded-xl border border-white/5 bg-black/20'>
+            {/* RPC */}
+            <div className='px-4 py-3'>
+              <div className='flex items-center justify-between gap-3'>
+                <div className='min-w-0'>
+                  <span className='text-xs font-bold text-foreground block'>RPC Provider</span>
+                  <span className='text-[11px] text-muted-foreground font-mono truncate block max-w-[220px] mt-0.5'>{rpcHost}</span>
                 </div>
+                {rpcStatus === 'checking' ? (
+                  <div className='w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin' />
+                ) : rpcStatus === 'online' ? (
+                  <div className='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/15'>
+                    <Zap className='h-3 w-3 text-emerald-400' />
+                    <span className='text-xs font-bold text-emerald-400 font-mono'>{rpcLatency}ms</span>
+                  </div>
+                ) : (
+                  <div className='flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20'>
+                    <WifiOff className='h-3 w-3 text-rose-400' />
+                    <span className='text-xs font-bold text-rose-400'>Offline</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* Active Network */}
+            <div className='px-4 py-3'>
+              <div className='flex items-center justify-between'>
+                <div>
+                  <span className='text-xs font-bold text-foreground block'>Active Cluster</span>
+                  <span className='text-[11px] text-muted-foreground mt-0.5'>Solana Devnet • Sponsored Gas</span>
+                </div>
+                <span className='text-[10px] font-mono font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 uppercase'>
+                  Devnet
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Card 3: Security & Actions */}
-        <div className='rounded-2xl overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm flex flex-col justify-between'>
-          {/* Security Guard Illustration Banner at Very Top */}
-          <div className='hidden lg:block relative overflow-hidden w-full h-80 shrink-0 border-b border-border/20'>
-            <img 
-              src='/images/settings_guard.png' 
-              alt='Security Guard Illustration'
-              className='object-cover w-full h-full opacity-75'
-            />
-            <div className='absolute inset-0 bg-gradient-to-t from-background/40 to-transparent' />
+        <div className='rounded-2xl overflow-hidden border border-white/10 premium-depth-card flex flex-col justify-between p-5 space-y-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2.5'>
+              <div className='w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center'>
+                <Shield className='h-4 w-4 text-emerald-400' />
+              </div>
+              <div>
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-foreground'>Security & Session</h3>
+                <p className='text-[10px] text-muted-foreground'>WebAuthn Passkey P-256 hardware enclave</p>
+              </div>
+            </div>
+            <span className='text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md'>
+              Hardware Bound
+            </span>
           </div>
 
-          {/* Content area */}
-          <div className='flex-1 flex flex-col justify-between py-1'>
-            {/* Header below image */}
-            <div className='flex items-center gap-2 px-4 pt-1 pb-0.5'>
-              <div className='w-6 h-6 rounded-lg bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center'>
-                <Shield className='h-3 w-3 text-emerald-400' />
+          <div className='space-y-2.5'>
+            {/* Export Activity */}
+            <button
+              onClick={handleExportActivity}
+              className='w-full flex items-center gap-3 p-3 rounded-xl premium-depth-inset hover:border-primary/30 transition-all group cursor-pointer'
+            >
+              <div className='w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0 group-hover:bg-sky-500/20 transition'>
+                <Download className='h-4 w-4 text-sky-400' />
               </div>
-              <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted-foreground'>Security & Actions</h3>
-            </div>
+              <div className='text-left flex-1 min-w-0'>
+                <span className='text-xs font-bold text-foreground block'>Export Ledger Activity</span>
+                <span className='text-[10px] text-muted-foreground mt-0.5'>{(activity || []).length} on-chain records available</span>
+              </div>
+              <span className='text-[10px] font-mono font-bold text-muted-foreground px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 shrink-0'>JSON</span>
+            </button>
 
-            {/* Action Buttons */}
-            <div className='px-4 pb-1.5 pt-0.5 space-y-2'>
-              {/* Export Activity */}
-              <button
-                onClick={handleExportActivity}
-                className='w-full flex items-center gap-3 p-2.5 rounded-xl premium-depth-inset hover:border-primary/20 transition-all group cursor-pointer'
-              >
-                <div className='w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/15 flex items-center justify-center shrink-0 group-hover:bg-sky-500/15 transition'>
-                  <Download className='h-3.5 w-3.5 text-sky-400' />
-                </div>
-                <div className='text-left flex-1 min-w-0'>
-                  <span className='text-xs font-bold text-foreground block'>Export Activity</span>
-                  <span className='text-[10px] text-muted-foreground mt-0.5'>{(activity || []).length} records available</span>
-                </div>
-                <span className='text-[9px] font-mono text-muted-foreground/50 px-1.5 py-0.5 rounded bg-background/40 shrink-0'>JSON</span>
-              </button>
-
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                className='w-full flex items-center gap-3 p-2.5 rounded-xl bg-destructive/5 border border-destructive/10 hover:bg-destructive/10 hover:border-destructive/20 transition-all group cursor-pointer'
-              >
-                <div className='w-8 h-8 rounded-lg bg-destructive/10 border border-destructive/15 flex items-center justify-center shrink-0 group-hover:bg-destructive/15 transition'>
-                  <LogOut className='h-3.5 w-3.5 text-destructive-foreground' />
-                </div>
-                <div className='text-left flex-1 min-w-0'>
-                  <span className='text-xs font-bold text-destructive-foreground block'>{t('common.logout')}</span>
-                  <span className='text-[10px] text-muted-foreground mt-0.5'>Disconnect passkey session</span>
-                </div>
-              </button>
-            </div>
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className='w-full flex items-center gap-3 p-3 rounded-xl bg-rose-500/5 border border-rose-500/15 hover:bg-rose-500/10 hover:border-rose-500/30 transition-all group cursor-pointer'
+            >
+              <div className='w-8 h-8 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 group-hover:bg-rose-500/20 transition'>
+                <LogOut className='h-4 w-4 text-rose-400' />
+              </div>
+              <div className='text-left flex-1 min-w-0'>
+                <span className='text-xs font-bold text-rose-300 block'>{t('common.logout')}</span>
+                <span className='text-[10px] text-muted-foreground mt-0.5'>Disconnect current passkey session</span>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Card 4: About */}
-        <div className='rounded-2xl overflow-hidden border border-border/50 bg-card/50 backdrop-blur-sm shadow-sm flex flex-col justify-between'>
-          {/* Content area */}
-          <div className='shrink-0'>
-            <div className='flex items-center gap-2 px-4 pt-2.5 pb-1'>
-              <div className='w-6 h-6 rounded-lg bg-violet-500/10 border border-violet-500/15 flex items-center justify-center'>
-                <Info className='h-3 w-3 text-violet-400' />
+        {/* Card 4: System Architecture & About */}
+        <div className='rounded-2xl overflow-hidden border border-white/10 premium-depth-card flex flex-col justify-between p-5 space-y-4'>
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2.5'>
+              <div className='w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center'>
+                <Info className='h-4 w-4 text-primary' />
               </div>
-              <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted-foreground'>About</h3>
-            </div>
-
-            <div className='divide-y divide-border/20'>
-              {[
-                { label: 'App', value: 'RampFi v1.0.0', icon: Activity },
-                { label: 'SDK', value: '@lazorkit/wallet ^2.0.1', icon: Database, mono: true },
-                { label: 'Blockchain', value: 'Solana (web3.js w1)', icon: Zap },
-              ].map((item) => (
-                <div key={item.label} className='px-4 py-1.5 flex items-center justify-between'>
-                  <div className='flex items-center gap-2'>
-                    <item.icon className='h-3.5 w-3.5 text-muted-foreground/50' />
-                    <span className='text-xs text-muted-foreground'>{item.label}</span>
-                  </div>
-                  <span className={`text-xs font-bold text-foreground ${item.mono ? 'font-mono' : ''}`}>{item.value}</span>
-                </div>
-              ))}
-              {/* System Status */}
-              <div className='px-4 py-1.5 flex items-center justify-between'>
-                <div className='flex items-center gap-2'>
-                  <Activity className='h-3.5 w-3.5 text-muted-foreground/50' />
-                  <span className='text-xs text-muted-foreground'>System Status</span>
-                </div>
-                <span className='text-xs font-bold text-emerald-400 flex items-center gap-1.5'>
-                  <span className='w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse' />
-                  Operational
-                </span>
-              </div>
-              {/* Links */}
-              <div className='px-4 py-1.5 flex items-center justify-between'>
-                {/* Links */}
-                <span className='text-xs text-muted-foreground'>Links</span>
-                <div className='flex items-center gap-3'>
-                  <a href='https://solana.com' target='_blank' rel='noopener noreferrer' className='text-xs text-primary hover:text-primary/80 transition flex items-center gap-1 font-semibold'>
-                    Solana <ExternalLink className='h-3 w-3' />
-                  </a>
-                  <a href='https://explorer.solana.com/?cluster=devnet' target='_blank' rel='noopener noreferrer' className='text-xs text-primary hover:text-primary/80 transition flex items-center gap-1 font-semibold'>
-                    Explorer <ExternalLink className='h-3 w-3' />
-                  </a>
-                </div>
+              <div>
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-foreground'>System Architecture</h3>
+                <p className='text-[10px] text-muted-foreground'>Smart Wallet PDA & SDK telemetry</p>
               </div>
             </div>
+            <span className='text-[10px] font-bold text-emerald-400 flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20'>
+              <span className='w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse' />
+              Operational
+            </span>
           </div>
 
-          {/* Security Illustration Footer (grows to fill remaining space) */}
-          <div className='hidden lg:block relative overflow-hidden border-t border-border/20 flex-1 min-h-[300px]'>
-            <img 
-              src='/images/settings_security.png' 
-              alt='Security Guard Illustration'
-              className='object-cover w-full h-full opacity-70 absolute inset-0'
-            />
-            <div className='absolute inset-0 bg-gradient-to-t from-background via-background/45 to-transparent' />
-            <div className='absolute bottom-0 left-0 right-0 px-4 pb-2'>
-              <div className='flex items-center gap-1.5'>
-                <Shield className='h-3 w-3 text-primary' />
-                <span className='text-xs font-bold text-foreground'>Secured by LazorKit SDK</span>
+          <div className='divide-y divide-white/5 rounded-xl border border-white/5 bg-black/20'>
+            {[
+              { label: 'Platform', value: 'RampFi v2.4 (2026)', icon: Activity },
+              { label: 'Passkey SDK', value: '@lazorkit/wallet ^3.4.1', icon: Database, mono: true },
+              { label: 'Execution Layer', value: 'Solana (@solana/web3.js)', icon: Zap, mono: true },
+            ].map((item) => (
+              <div key={item.label} className='px-4 py-2.5 flex items-center justify-between'>
+                <div className='flex items-center gap-2'>
+                  <item.icon className='h-3.5 w-3.5 text-primary/70' />
+                  <span className='text-xs text-muted-foreground'>{item.label}</span>
+                </div>
+                <span className={`text-xs font-bold text-foreground ${item.mono ? 'font-mono text-[11px]' : ''}`}>{item.value}</span>
+              </div>
+            ))}
+            {/* Links */}
+            <div className='px-4 py-2.5 flex items-center justify-between'>
+              <span className='text-xs text-muted-foreground'>Explorer & Docs</span>
+              <div className='flex items-center gap-3'>
+                <a href='https://solana.com' target='_blank' rel='noopener noreferrer' className='text-xs text-primary hover:text-primary/80 transition flex items-center gap-1 font-bold'>
+                  Solana <ExternalLink className='h-3 w-3' />
+                </a>
+                <a href='https://explorer.solana.com/?cluster=devnet' target='_blank' rel='noopener noreferrer' className='text-xs text-primary hover:text-primary/80 transition flex items-center gap-1 font-bold'>
+                  Explorer <ExternalLink className='h-3 w-3' />
+                </a>
               </div>
             </div>
           </div>

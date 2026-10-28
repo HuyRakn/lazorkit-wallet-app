@@ -10,6 +10,7 @@ import { Button } from './ui/button';
 import { TokenLogo } from './ui/token-logo';
 import { motion } from 'framer-motion';
 import { WalletBanner } from './wallet-banner';
+import { FaucetCard } from './faucet-card';
 import {
   formatCurrency,
   formatTokenAmount,
@@ -122,11 +123,53 @@ export const AssetsTab = ({ onDepositClick, hideWalletCard = false, compact = fa
         </div>
       )}
 
+      {/* ─── 2026 Portfolio Allocation Bar ─── */}
+      {!loading && !error && !isNoAssets && portfolio.allocations.length > 0 && (
+        <div className="premium-depth-card rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-bold uppercase tracking-wider text-muted-foreground">
+              Asset Allocation
+            </span>
+            <span className="font-mono font-extrabold text-white">
+              {showBalance ? formatCurrency(displayTotal, fiat) : '••••••'}
+            </span>
+          </div>
+          {/* Multi-segment progress bar */}
+          <div className="h-2 w-full rounded-full bg-white/[0.04] overflow-hidden flex gap-0.5 p-0.5 border border-white/[0.06]">
+            {portfolio.allocations.map((alloc) => (
+              <div
+                key={alloc.symbol}
+                style={{
+                  width: `${Math.max(alloc.pct, 3)}%`,
+                  backgroundColor: alloc.color,
+                }}
+                className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-500"
+                title={`${alloc.symbol}: ${alloc.pct.toFixed(1)}%`}
+              />
+            ))}
+          </div>
+          {/* Allocation legend */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {portfolio.allocations.slice(0, 5).map((alloc) => (
+              <div key={alloc.symbol} className="flex items-center gap-1.5 text-[10px]">
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ backgroundColor: alloc.color }}
+                />
+                <span className="font-bold text-white/90">{alloc.symbol}</span>
+                <span className="font-mono text-muted-foreground">{alloc.pct.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ─── Assets List Container (Flat list in single card) ─── */}
       <div className="space-y-3">
         <div className='flex items-center justify-between'>
           <h3 className='text-sm font-bold uppercase tracking-wider text-muted-foreground'>Holdings</h3>
           <div className='flex items-center gap-2'>
+            <FaucetCard variant='button' />
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'value' | 'change')}
@@ -182,13 +225,17 @@ export const AssetsTab = ({ onDepositClick, hideWalletCard = false, compact = fa
             <div className='text-center py-10 px-4 bg-card/10'>
               <div className='text-xs text-muted-foreground font-bold uppercase tracking-wider mb-2'>No Assets Available</div>
               <div className='text-xs text-muted-foreground/60 mb-4'>This passkey wallet currently holds 0 SOL.</div>
+              <div className='max-w-md mx-auto mb-3 text-left'>
+                <FaucetCard />
+              </div>
               <Button
                 size='sm'
+                variant='outline'
                 onClick={() => { setActiveSection('buy'); router.push('/'); }}
-                className='px-4 h-9 rounded-lg text-xs font-bold text-white bg-primary hover:bg-primary/90 transition-all inline-flex items-center gap-1.5'
+                className='px-4 h-9 rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5'
               >
                 <ShoppingCart className='h-3.5 w-3.5' />
-                Get Devnet Tokens
+                Buy with VietQR
               </Button>
             </div>
           )}

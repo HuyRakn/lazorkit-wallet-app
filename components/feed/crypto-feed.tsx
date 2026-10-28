@@ -6,8 +6,11 @@ import { NewsCard } from './news-card';
 import { FeedSkeleton } from '@/components/ui/loading-skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWalletStore } from '@/lib/store/wallet';
-import { Heart, MessageSquare, Send, Share2, Sparkles, User, Newspaper, Users, Activity, RefreshCw, PenSquare, ExternalLink } from 'lucide-react';
+import { Heart, MessageSquare, Send, Share2, ShieldCheck, User, Newspaper, Users, Activity, RefreshCw, PenSquare, ExternalLink } from 'lucide-react';
+import { Blockie } from '@/components/ui/blockie';
 import { Button } from '../ui/button';
+import { useSiws } from '@/hooks/use-siws';
+import { toast } from '@/hooks/use-toast';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -20,6 +23,9 @@ interface CryptoFeedProps {
 export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
   const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:3001';
   const { pubkey, hasWallet, activity } = useWalletStore();
+  const { authedFetch } = useSiws();
+  const reportAuthError = (err: unknown) =>
+    toast({ title: 'Action failed', description: (err as Error)?.message || 'Please try again', variant: 'destructive' });
   const [activeTab, setActiveTab] = useState<FeedTab>('news');
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
@@ -39,8 +45,16 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
     { refreshInterval: 8000, dedupingInterval: 3000 }
   );
 
+  // ── SWR: On-Chain Ecosystem Feed (12s refresh) ──
+  const { data: ecosystemData, isLoading: ecosystemLoading } = useSWR(
+    activeTab === 'activity' ? `${apiBase}/api/feed/onchain` : null,
+    fetcher,
+    { refreshInterval: 12000, dedupingInterval: 5000 }
+  );
+
   const newsArticles = Array.isArray(newsData) ? newsData : [];
   const posts = feedData?.posts || [];
+  const ecosystemEvents = Array.isArray(ecosystemData) ? ecosystemData : [];
 
   // ── Compose Post State ──
   const [composeText, setComposeText] = useState('');
@@ -51,22 +65,25 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
     if (!composeText.trim() || !pubkey || composeSubmitting) return;
     setComposeSubmitting(true);
     try {
-      const res = await fetch(`${apiBase}/api/posts`, {
+      const res = await authedFetch(`/api/posts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: pubkey, content: composeText.trim() }),
+        body: JSON.stringify({ content: composeText.trim() }),
       });
       if (res.ok) {
         setComposeText('');
         setIsComposing(false);
         mutatePosts();
+      } else {
+        reportAuthError(new Error((await res.json().catch(() => ({}))).error));
       }
     } catch (err) {
       console.error('Failed to create post:', err);
+      reportAuthError(err);
     } finally {
       setComposeSubmitting(false);
     }
-  }, [composeText, pubkey, composeSubmitting, apiBase, mutatePosts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composeText, pubkey, composeSubmitting, authedFetch, mutatePosts]);
 
   const handleToggleLike = async (postId: string) => {
     if (!pubkey) return;
@@ -82,14 +99,13 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
         return p;
       });
       mutatePosts({ ...feedData, posts: updatedPosts }, false);
-      const res = await fetch(`${apiBase}/api/posts/${postId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: pubkey }),
-      });
-      if (res.ok) mutatePosts();
+      const res = await authedFetch(`/api/posts/${postId}/like`, { method: 'POST' });
+      mutatePosts();
+      if (!res.ok) reportAuthError(new Error((await res.json().catch(() => ({}))).error));
     } catch (err) {
       console.error('Failed to toggle like:', err);
+      mutatePosts();
+      reportAuthError(err);
     }
   };
 
@@ -98,17 +114,19 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
     if (!text || !text.trim() || !pubkey || isSubmittingComment[postId]) return;
     try {
       setIsSubmittingComment((prev) => ({ ...prev, [postId]: true }));
-      const res = await fetch(`${apiBase}/api/posts/${postId}/comment`, {
+      const res = await authedFetch(`/api/posts/${postId}/comment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: pubkey, content: text.trim() }),
+        body: JSON.stringify({ content: text.trim() }),
       });
       if (res.ok) {
         setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
         mutatePosts();
+      } else {
+        reportAuthError(new Error((await res.json().catch(() => ({}))).error));
       }
     } catch (err) {
       console.error('Failed to submit comment:', err);
+      reportAuthError(err);
     } finally {
       setIsSubmittingComment((prev) => ({ ...prev, [postId]: false }));
     }
@@ -365,12 +383,12 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
                       <div className="group glass-card rounded-xl border border-border/50 p-4 space-y-3 transition-all duration-300 relative overflow-hidden select-none hover:shadow-lg hover:shadow-primary/5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 via-accent/10 to-emerald-500/15 flex items-center justify-center border border-border/40 font-mono text-[9px] font-black uppercase text-foreground">
-                              {post.walletAddress.slice(0, 2)}
+                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white/15 shrink-0">
+                              <Blockie seed={post.walletAddress} size={8} scale={4} />
                             </div>
                             <div className="flex flex-col">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-foreground">
+                                <span className="text-xs font-bold text-foreground font-mono">
                                   {formatAddress(post.walletAddress)}
                                 </span>
                                 {pubkey && post.walletAddress === pubkey && (
@@ -382,8 +400,9 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 font-bold tracking-wider uppercase">
-                            <Sparkles className="h-3 w-3 text-primary/50" />
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-[9px] text-primary font-bold tracking-wider uppercase">
+                            <ShieldCheck className="h-3 w-3 text-primary" />
+                            <span>Signed</span>
                           </div>
                         </div>
 
@@ -483,79 +502,117 @@ export function CryptoFeed({ onTradeClick }: CryptoFeedProps) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
-            className="space-y-3"
+            className="space-y-5"
           >
-            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
-              Your Wallet Activity • Solana Devnet
-            </span>
+            {/* Wallet Personal Activity */}
+            <div className="space-y-2">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Your Wallet Activity • Solana Devnet
+              </span>
 
-            {!pubkey ? (
-              <div className="text-center py-10 border border-dashed border-border rounded-xl space-y-3">
-                <Activity className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-                <p className="text-xs text-muted-foreground">Connect your wallet to see on-chain activity.</p>
-              </div>
-            ) : onChainActivity.length > 0 ? (
-              <motion.div
-                initial="hidden"
-                animate="show"
-                variants={{
-                  hidden: { opacity: 0 },
-                  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-                }}
-                className="space-y-2"
-              >
-                {onChainActivity.map((act: any, idx: number) => (
-                  <motion.div
-                    key={act.id || idx}
-                    variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
-                    className="glass-card rounded-xl border border-border/40 p-3.5 flex items-center justify-between hover:border-primary/15 transition-all"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                        act.kind === 'send' ? 'bg-rose-500/10 text-rose-400' :
-                        act.kind === 'swap' ? 'bg-purple-500/10 text-purple-400' :
-                        act.kind === 'onramp' ? 'bg-emerald-500/10 text-emerald-400' :
-                        'bg-primary/10 text-primary'
-                      }`}>
-                        {act.kind === 'send' ? '↗' : act.kind === 'swap' ? '⇄' : act.kind === 'onramp' ? '↓' : '◉'}
+              {!pubkey ? (
+                <div className="text-center py-6 border border-dashed border-border/40 rounded-xl space-y-2">
+                  <Activity className="h-6 w-6 text-muted-foreground/30 mx-auto" />
+                  <p className="text-xs text-muted-foreground">Connect your wallet to see personal transactions.</p>
+                </div>
+              ) : onChainActivity.length > 0 ? (
+                <div className="space-y-2">
+                  {onChainActivity.map((act: any, idx: number) => {
+                    const txSig = act.tx || act.txSignature;
+                    return (
+                      <div
+                        key={act.id || idx}
+                        className="glass-card rounded-xl border border-border/40 p-3.5 flex items-center justify-between hover:border-primary/15 transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                            act.kind === 'send' ? 'bg-rose-500/10 text-rose-400' :
+                            act.kind === 'swap' ? 'bg-purple-500/10 text-purple-400' :
+                            act.kind === 'onramp' ? 'bg-emerald-500/10 text-emerald-400' :
+                            'bg-primary/10 text-primary'
+                          }`}>
+                            {act.kind === 'send' ? '↗' : act.kind === 'swap' ? '⇄' : act.kind === 'onramp' ? '↓' : '◉'}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-foreground">{act.summary}</span>
+                            <span className="text-[9px] text-muted-foreground">{formatTimeAgo(act.ts)}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {act.status && (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              act.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400' :
+                              act.status === 'Failed' ? 'bg-rose-500/10 text-rose-400' :
+                              'bg-amber-500/10 text-amber-400'
+                            }`}>
+                              {act.status}
+                            </span>
+                          )}
+                          {txSig && (
+                            <a
+                              href={`https://explorer.solana.com/tx/${txSig}?cluster=devnet`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-muted-foreground/40 hover:text-primary transition"
+                              title="View on Solana Explorer"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-foreground">{act.summary}</span>
-                        <span className="text-[9px] text-muted-foreground">{formatTimeAgo(act.ts)}</span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed border-border/40 rounded-xl space-y-1">
+                  <p className="text-xs text-muted-foreground">No recent wallet transactions found.</p>
+                </div>
+              )}
+            </div>
+
+            {/* Ecosystem Devnet Activity */}
+            <div className="space-y-2 pt-2 border-t border-border/20">
+              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Ecosystem Activity • Live Devnet Transactions
+              </span>
+
+              {ecosystemEvents.length > 0 ? (
+                <div className="space-y-2">
+                  {ecosystemEvents.map((event: any) => (
+                    <div
+                      key={event.id || event.tx}
+                      className="glass-card rounded-xl border border-border/40 p-3 flex items-center justify-between hover:border-primary/15 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                          {event.type === 'swap' ? '⇄' : event.type === 'onramp' ? '↓' : '★'}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-foreground">{event.summary}</p>
+                          <p className="text-[9px] text-muted-foreground">{formatTimeAgo(event.timestamp)}</p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {act.status && (
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                          act.status === 'Success' ? 'bg-emerald-500/10 text-emerald-400' :
-                          act.status === 'Failed' ? 'bg-rose-500/10 text-rose-400' :
-                          'bg-amber-500/10 text-amber-400'
-                        }`}>
-                          {act.status}
-                        </span>
-                      )}
-                      {act.txSignature && (
+                      {event.tx && (
                         <a
-                          href={`https://explorer.solana.com/tx/${act.txSignature}?cluster=devnet`}
+                          href={`https://explorer.solana.com/tx/${event.tx}?cluster=devnet`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground/40 hover:text-primary transition"
-                          title="View on Solana Explorer"
+                          className="text-muted-foreground/40 hover:text-primary transition inline-flex items-center gap-1 text-[10px]"
                         >
-                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="font-mono">{event.tx.slice(0, 4)}…{event.tx.slice(-4)}</span>
+                          <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
                     </div>
-                  </motion.div>
-                ))}
-              </motion.div>
-            ) : (
-              <div className="text-center py-10 border border-dashed border-border rounded-xl space-y-3">
-                <Activity className="h-8 w-8 text-muted-foreground/30 mx-auto" />
-                <p className="text-xs text-muted-foreground">No on-chain activity found yet.</p>
-                <p className="text-[10px] text-muted-foreground/60">Send a transaction to see it appear here.</p>
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 border border-dashed border-border/30 rounded-xl">
+                  <p className="text-xs text-muted-foreground">Monitoring devnet pool activity...</p>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
+const { requireWallet } = require('../middleware/authenticate');
 
 // No simulated feed — all posts are real user-generated content only
 // Posts are created via the POST / endpoint by authenticated wallet users
@@ -33,9 +34,10 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new post
-router.post('/', async (req, res) => {
+router.post('/', requireWallet, async (req, res) => {
   try {
-    const { walletAddress, content } = req.body;
+    const walletAddress = req.wallet;
+    const { content } = req.body;
 
     if (!walletAddress || !content) {
       return res.status(400).json({ error: 'Wallet address and content are required' });
@@ -60,9 +62,9 @@ router.post('/', async (req, res) => {
 });
 
 // Like / Unlike a post
-router.post('/:id/like', async (req, res) => {
+router.post('/:id/like', requireWallet, async (req, res) => {
   try {
-    const { walletAddress } = req.body;
+    const walletAddress = req.wallet;
     const { id } = req.params;
 
     if (!walletAddress) {
@@ -92,9 +94,10 @@ router.post('/:id/like', async (req, res) => {
 });
 
 // Comment on a post
-router.post('/:id/comment', async (req, res) => {
+router.post('/:id/comment', requireWallet, async (req, res) => {
   try {
-    const { walletAddress, content } = req.body;
+    const walletAddress = req.wallet;
+    const { content } = req.body;
     const { id } = req.params;
 
     if (!walletAddress || !content) {

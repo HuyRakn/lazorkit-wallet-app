@@ -59,7 +59,29 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+/**
+ * Wallet-scoped auth: only a SIWS token (issued after the wallet's passkey signed a
+ * one-time message, verified against its on-chain authority) passes. Sets `req.wallet`.
+ * A `walletAddress` in the body must be that wallet.
+ */
+const requireWallet = (req, res, next) => {
+  const { walletFromToken } = require('../utils/siws');
+  const header = req.headers.authorization || '';
+  const wallet = header.startsWith('Bearer ') ? walletFromToken(header.slice(7)) : null;
+  if (!wallet) {
+    return res.status(401).json({ error: 'Sign in with your wallet first.', code: 'SIWS_REQUIRED' });
+  }
+  const claimed = req.body?.walletAddress;
+  if (claimed && claimed !== wallet) {
+    return res.status(403).json({ error: 'walletAddress does not match the signed-in wallet.' });
+  }
+  req.wallet = wallet;
+  req.user = { ...(req.user || {}), id: wallet, wallet };
+  next();
+};
+
 module.exports = {
   authenticate,
-  requireAuth
+  requireAuth,
+  requireWallet,
 };

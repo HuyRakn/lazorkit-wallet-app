@@ -80,6 +80,13 @@ function CheckoutContent() {
     setError(null);
 
     if (status === 'failed') {
+      const backendBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+      // Sandbox provider: mark the order as failed (best effort)
+      fetch(`${backendBase}/api/orders/mock-provider/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: ref }),
+      }).catch(() => {});
       const returnFailed = `/callback/failed?status=failed&ref=${encodeURIComponent(ref || '')}&token=${encodeURIComponent(order?.token || '')}&currency=${encodeURIComponent(order?.currency || '')}&amount=${encodeURIComponent(order?.amount || 0)}`;
       router.push(returnFailed);
       return;
@@ -97,7 +104,8 @@ function CheckoutContent() {
       // Step 3: Minting SPL tokens (Simulated wait)
       setTimeout(() => setProcessStep(3), 5000);
 
-      const response = await fetch(`${backendBase}/api/orders/callback/success`, {
+      // Sandbox payment provider settles the order (real providers call the signed webhook)
+      const response = await fetch(`${backendBase}/api/orders/mock-provider/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reference: ref }),

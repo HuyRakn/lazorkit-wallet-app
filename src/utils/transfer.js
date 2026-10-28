@@ -1,26 +1,58 @@
-const { Connection, PublicKey, Keypair } = require('@solana/web3.js');
-const { 
-  transfer, 
+const {
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  sendAndConfirmTransaction,
+  LAMPORTS_PER_SOL,
+} = require('@solana/web3.js');
+const {
+  transfer,
   getOrCreateAssociatedTokenAccount,
-  getAccount
+  getAccount,
 } = require('@solana/spl-token');
-const bs58 = require('bs58');
+const { getConnection, getAdminKeypair, getUsdcMint } = require('./solana');
 
-// Environment variables
-const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-const TOKEN_MINT = process.env.TOKEN_MINT;
-const TOKEN_DECIMALS = process.env.TOKEN_DECIMALS ? parseInt(process.env.TOKEN_DECIMALS) : undefined;
+/**
+ * Transfer native SOL from the admin treasury wallet to a recipient on-chain.
+ * @param {string} recipientAddress
+ * @param {number} solAmount
+ * @returns {Promise<{signature: string, amount: number, lamports: number}>}
+ */
+async function transferSolToUser(recipientAddress, solAmount) {
+  const connection = getConnection();
+  const adminKeypair = getAdminKeypair();
+  const recipientPubkey = new PublicKey(recipientAddress);
+  const lamports = Math.round(Number(solAmount) * LAMPORTS_PER_SOL);
 
-if (!PRIVATE_KEY) {
-  throw new Error('PRIVATE_KEY environment variable is required');
+  if (!Number.isFinite(lamports) || lamports <= 0) {
+    throw new Error(`Invalid SOL transfer amount: ${solAmount}`);
+  }
+
+  const adminBalance = await connection.getBalance(adminKeypair.publicKey, 'confirmed');
+  if (adminBalance < lamports + 10000) {
+    throw new Error(
+      `Insufficient treasury SOL balance (${(adminBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL)`
+    );
+  }
+
+  const tx = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: adminKeypair.publicKey,
+      toPubkey: recipientPubkey,
+      lamports,
+    })
+  );
+
+  const signature = await sendAndConfirmTransaction(connection, tx, [adminKeypair], {
+    commitment: 'confirmed',
+  });
+
+  return {
+    signature,
+    amount: solAmount,
+    lamports,
+  };
 }
-
-if (!TOKEN_MINT) {
-  throw new Error('TOKEN_MINT environment variable is required');
-}
-
-const connection = new Connection(RPC_URL, 'confirmed');
 
 /**
  * Transfer SPL tokens from admin wallet to recipient
@@ -28,113 +60,74 @@ const connection = new Connection(RPC_URL, 'confirmed');
  * @param {number} amount - Amount to transfer (in token units, not raw)
  * @param {string} tokenMint - Token mint address (optional, uses env var if not provided)
  * @param {number} decimals - Token decimals (optional, uses env var if not provided)
- * @returns {Promise<{signature: string, amount: number}>}
+ * @returns {Promise<{signature: string, amount: number, decimals: number}>}
  */
-async function transferSplTokenToUser(recipientAddress, amount, tokenMint = TOKEN_MINT, decimals = TOKEN_DECIMALS) {
-  try {
-    console.log('=== SPL Token Transfer Started ===');
-    console.log('RPC URL:', RPC_URL);
-    console.log('Token Mint:', tokenMint);
-    console.log('Recipient:', recipientAddress);
-    console.log('Amount:', amount);
-    console.log('Decimals:', decimals);
+async function transferSplTokenToUser(
+  recipientAddress,
+  amount,
+  tokenMint = getUsdcMint(),
+  decimals = process.env.TOKEN_DECIMALS ? parseInt(process.env.TOKEN_DECIMALS, 10) : 6
+) {
+  const connection = getConnection();
+  const adminKeypair = getAdminKeypair();
+  const adminPubkey = adminKeypair.publicKey;
+  const recipientPubkey = new PublicKey(recipientAddress);
+  const tokenMintPubkey = new PublicKey(tokenMint);
 
-    // Parse admin private key
-    const adminKeypair = Keypair.fromSecretKey(bs58.decode(PRIVATE_KEY));
-    const adminPubkey = adminKeypair.publicKey;
-    console.log('Admin wallet:', adminPubkey.toString());
+  // Get or create admin's token account
+  const adminTokenAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    adminKeypair,
+    tokenMintPubkey,
+    adminPubkey
+  );
 
-    // Parse recipient public key
-    const recipientPubkey = new PublicKey(recipientAddress);
-    const tokenMintPubkey = new PublicKey(tokenMint);
+  const adminAccountInfo = await getAccount(connection, adminTokenAccount.address);
 
-    // Get or create admin's token account
-    console.log('Getting admin token account...');
-    const adminTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      adminKeypair,
-      tokenMintPubkey,
-      adminPubkey
-    );
-    console.log('Admin ATA:', adminTokenAccount.address.toString());
+  // Get or create recipient's token account (allowOwnerOffCurve = true for smart wallet PDAs)
+  const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    adminKeypair,
+    tokenMintPubkey,
+    recipientPubkey,
+    true
+  );
 
-    // Get admin token account info
-    const adminAccountInfo = await getAccount(connection, adminTokenAccount.address);
-    console.log('Admin token balance:', adminAccountInfo.amount.toString());
-
-    // Get or create recipient's token account (with allowOwnerOffCurve for smart wallets)
-    console.log('Getting recipient token account...');
-    const recipientTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      adminKeypair,
-      tokenMintPubkey,
-      recipientPubkey,
-      true // allowOwnerOffCurve for smart wallets (PDAs)
-    );
-    console.log('Recipient ATA:', recipientTokenAccount.address.toString());
-
-    // Convert amount to raw units
-    let rawAmount;
-    if (decimals !== undefined) {
-      rawAmount = Math.floor(amount * Math.pow(10, decimals));
-    } else {
-      // Try to get decimals from on-chain if not provided
-      console.log('Decimals not provided, fetching from on-chain...');
-      try {
-        const mintInfo = await connection.getParsedAccountInfo(tokenMintPubkey);
-        if (mintInfo.value?.data?.parsed?.info?.decimals !== undefined) {
-          decimals = mintInfo.value.data.parsed.info.decimals;
-          rawAmount = Math.floor(amount * Math.pow(10, decimals));
-          console.log('Fetched decimals from chain:', decimals);
-        } else {
-          throw new Error('Could not fetch decimals from chain');
-        }
-      } catch (error) {
-        console.error('Error fetching decimals:', error);
-        throw new Error('Could not determine token decimals');
-      }
-    }
-
-    console.log('Raw amount to transfer:', rawAmount);
-
-    // Check if admin has sufficient balance
-    if (adminAccountInfo.amount < BigInt(rawAmount)) {
-      throw new Error(`Insufficient token balance. Admin has ${adminAccountInfo.amount.toString()}, trying to transfer ${rawAmount}`);
-    }
-
-    // Check if admin has enough SOL for transaction fees
-    const adminSolBalance = await connection.getBalance(adminPubkey);
-    console.log('Admin SOL balance:', adminSolBalance / 1e9, 'SOL');
-    if (adminSolBalance < 5000) { // Minimum 0.000005 SOL for fees
-      throw new Error(`Insufficient SOL for transaction fees. Admin has ${adminSolBalance / 1e9} SOL`);
-    }
-
-    // Perform the transfer
-    console.log('Executing transfer...');
-    const signature = await transfer(
-      connection,
-      adminKeypair,
-      adminTokenAccount.address,
-      recipientTokenAccount.address,
-      adminPubkey,
-      rawAmount
-    );
-
-    console.log('Transfer signature:', signature);
-    console.log('=== SPL Token Transfer Completed ===');
-
-    return {
-      signature,
-      amount: amount,
-      decimals: decimals
-    };
-
-  } catch (error) {
-    console.error('SPL Token transfer failed:', error);
-    throw error;
+  let resolvedDecimals = decimals;
+  if (resolvedDecimals === undefined || Number.isNaN(resolvedDecimals)) {
+    const mintInfo = await connection.getParsedAccountInfo(tokenMintPubkey);
+    resolvedDecimals = mintInfo.value?.data?.parsed?.info?.decimals ?? 6;
   }
+
+  const rawAmount = Math.floor(Number(amount) * Math.pow(10, resolvedDecimals));
+  if (!Number.isFinite(rawAmount) || rawAmount <= 0) {
+    throw new Error(`Invalid SPL transfer amount: ${amount}`);
+  }
+
+  if (adminAccountInfo.amount < BigInt(rawAmount)) {
+    throw new Error(
+      `Insufficient token balance. Admin has ${adminAccountInfo.amount.toString()}, trying to transfer ${rawAmount}`
+    );
+  }
+
+  const signature = await transfer(
+    connection,
+    adminKeypair,
+    adminTokenAccount.address,
+    recipientTokenAccount.address,
+    adminPubkey,
+    rawAmount
+  );
+
+  return {
+    signature,
+    amount,
+    decimals: resolvedDecimals,
+  };
 }
 
 module.exports = {
-  transferSplTokenToUser
+  transferSolToUser,
+  transferSplTokenToUser,
 };
+

@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink, Star, Heart, Shield, Sparkles, ShieldCheck, Users } from 'lucide-react';
+import { ExternalLink, Star, Heart, Shield, ArrowUpRight, ShieldCheck, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -113,31 +113,33 @@ export const AppDetailModal = ({ app, open, onOpenChange }: AppDetailModalProps)
       className="max-w-lg"
     >
       <div className="flex flex-col">
-        {/* Banner with App Icon */}
-        <div className="relative h-44 w-full bg-slate-900 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent z-10" />
-          <img
-            src={getAppBannerImage(app.name, app.category)}
-            alt={`${app.name} banner`}
-            className="w-full h-full object-cover opacity-50"
-          />
+        {/* Banner with App Icon (outer relative wrapper without overflow-hidden so the badge/logo overlaps cleanly) */}
+        <div className="relative h-44 w-full">
+          <div className="relative h-full w-full bg-slate-900 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#090d16] via-[#090d16]/30 to-transparent z-10" />
+            <img
+              src={getAppBannerImage(app.name, app.category)}
+              alt={`${app.name} banner`}
+              className="w-full h-full object-cover opacity-55"
+            />
 
-          {/* Floating Category */}
-          <span className="absolute top-4 left-4 z-20 px-2 py-0.5 rounded-md bg-slate-950/65 backdrop-blur-md border border-white/10 text-[10px] font-extrabold text-primary uppercase tracking-wider">
-            {app.category}
-          </span>
+            {/* Floating Category */}
+            <span className="absolute top-4 left-4 z-20 px-2.5 py-0.5 rounded-md bg-slate-950/75 backdrop-blur-md border border-white/10 text-[10px] font-extrabold text-primary uppercase tracking-wider">
+              {app.category}
+            </span>
 
-          {/* Verified Label */}
-          {app.verified && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
-              <ShieldCheck className="h-3.5 w-3.5 fill-emerald-500/10" />
-              <span>Verified</span>
-            </div>
-          )}
+            {/* Verified Label */}
+            {app.verified && (
+              <div className="absolute top-4 right-4 z-20 flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
+                <ShieldCheck className="h-3.5 w-3.5 fill-emerald-500/10" />
+                <span>Verified</span>
+              </div>
+            )}
+          </div>
 
-          {/* App Logo */}
-          <div className="absolute -bottom-6 left-6 z-20 w-16 h-16 rounded-2xl bg-slate-950 border border-white/10 p-1 flex items-center justify-center shadow-2xl overflow-hidden">
-            <div className="w-full h-full rounded-xl bg-slate-900 flex items-center justify-center text-2xl">
+          {/* App Logo overlapping bottom edge without clipping */}
+          <div className="absolute -bottom-6 left-6 z-30 w-16 h-16 rounded-2xl bg-[#090d16] border border-white/15 p-1 flex items-center justify-center shadow-[0_12px_28px_rgba(0,0,0,0.65)]">
+            <div className="w-full h-full rounded-xl bg-slate-900/90 flex items-center justify-center text-2xl">
               {getAppIcon(app.name)}
             </div>
           </div>
@@ -241,8 +243,8 @@ export const AppDetailModal = ({ app, open, onOpenChange }: AppDetailModalProps)
               onClick={handleOpenApp}
               className="flex-1 h-11 bg-primary text-slate-950 font-extrabold hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/10"
             >
-              <Sparkles className="h-4 w-4 mr-2 fill-slate-950" />
-              Open Portal
+              <ArrowUpRight className="h-4 w-4 mr-1.5 stroke-[2.5]" />
+              Launch App
             </Button>
           </div>
         </div>

@@ -2,20 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowUpDown, Settings2, ChevronDown, Sparkles, RefreshCcw, Search, X } from 'lucide-react';
+import { ArrowUpDown, ChevronDown, RefreshCcw, Search, X, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card } from './ui/card';
 import { TokenLogo } from './ui/token-logo';
 import { ViewportModal } from './ui/viewport-modal';
-import { useWalletStore, TokenSym, SwapResult } from '@/lib/store/wallet';
-import { useWallet } from '@/hooks/use-lazorkit-wallet';
+import { useWalletStore, TokenSym } from '@/lib/store/wallet';
+import { useWallet, resolveLookupTables } from '@/hooks/use-lazorkit-wallet';
 import { motion } from 'framer-motion';
-import { formatTokenAmount, formatCurrency } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
 import { SwapReviewModal } from './swap-review-modal';
 import { toast } from '@/hooks/use-toast';
-import { JupiterToken, getSwapQuote, TOKEN_ADDRESSES, getSymbolDecimals } from '@/lib/services/jupiter';
+import { JupiterToken, TOKEN_ADDRESSES, getSymbolDecimals, DEVNET_TRADABLE_TOKENS, defaultConnection } from '@/lib/services/jupiter';
+import { getDevnetSwapQuote, buildDevnetSwap, type DevnetSwapQuote, type SerializedInstruction } from '@/lib/services/backend-api';
+import { PublicKey, TransactionInstruction } from '@solana/web3.js';
+
+const toInstruction = (ix: SerializedInstruction) =>
+  new TransactionInstruction({
+    programId: new PublicKey(ix.programId),
+    keys: ix.keys.map((k) => ({ pubkey: new PublicKey(k.pubkey), isSigner: k.isSigner, isWritable: k.isWritable })),
+    data: Buffer.from(ix.data, 'base64'),
+  });
 
 interface SwapFormProps {
   onPreview?: (data: SwapData) => void;
@@ -32,14 +41,7 @@ interface SwapData {
   toToken: TokenSym;
   amount: number;
   slippage: number;
-  quote?: {
-    inputMint: string;
-    inAmount: string;
-    outputMint: string;
-    outAmount: string;
-    priceImpactPct?: string;
-    routePlan?: unknown[];
-  };
+  quote?: DevnetSwapQuote;
   estimatedReceive?: number;
 }
 
@@ -53,8 +55,8 @@ export const SwapForm = ({
   onSwitchToBuy,
   onTokenChange,
 }: SwapFormProps) => {
-  const { tokens, swapReal, addActivity, refreshBalances } = useWalletStore();
-  const lz = useWallet() as any;
+  const { tokens, pubkey, addActivity, refreshBalances } = useWalletStore();
+  const lz = useWallet();
   const [fromToken, setFromToken] = useState<TokenSym>(initialFromToken || 'USDC');
   const [toToken, setToToken] = useState<TokenSym>(initialToToken || 'SOL');
 
@@ -73,6 +75,7 @@ export const SwapForm = ({
   const [quote, setQuote] = useState<SwapData['quote'] | undefined>(undefined);
   const [loadingQuote, setLoadingQuote] = useState(false);
   const [quoteCountdown, setQuoteCountdown] = useState(30);
+  const [swapDone, setSwapDone] = useState(false);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -118,58 +121,41 @@ export const SwapForm = ({
     return () => clearInterval(iv);
   }, [quote, amountNum]);
 
-  // Fetch Jupiter quote when amount or tokens change
+  const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
+  const fromDecimals = getSymbolDecimals(fromToken, tokenData?.get(fromToken));
+  const toRaw = (n: number) => Math.round(n * Math.pow(10, fromDecimals)).toString();
+
+  // Fetch an on-chain quote from the RampFi Raydium CPMM devnet pool
   useEffect(() => {
+    let cancelled = false;
     const fetchQuote = async () => {
-      if (!amountNum || fromToken === toToken) {
-        setQuote(undefined);
-        return;
-      }
-
-      const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
-      const toMint = (TOKEN_ADDRESSES as Record<string, string>)[toToken];
-      
-      if (!fromMint || !toMint) {
-        setQuote(undefined);
-        return;
-      }
-
-      // Validate amount before API call
-      if (amountNum <= 0 || !isFinite(amountNum)) {
+      if (!amountNum || fromToken === toToken || !fromMint || amountNum <= 0 || !isFinite(amountNum)) {
         setQuote(undefined);
         return;
       }
 
       setLoadingQuote(true);
       try {
-        const fromDecimals = getSymbolDecimals(
-          fromToken,
-          tokenData?.get(fromToken)
-        );
-        const jupiterQuote = await getSwapQuote(
-          fromMint,
-          toMint,
-          Math.round(amountNum * Math.pow(10, fromDecimals)),
-          slippage * 100 // Convert percentage to basis points
-        );
-        
-        if (jupiterQuote && typeof jupiterQuote === 'object') {
-          setQuote(jupiterQuote);
-        } else {
-          setQuote(undefined);
-          console.warn('No valid quote received from Jupiter API');
-        }
+        const q = await getDevnetSwapQuote(fromMint, toRaw(amountNum), slippage * 100);
+        if (!cancelled) setQuote(q);
       } catch (error) {
-        console.error('Error fetching quote:', error);
-        setQuote(undefined);
+        console.error('Error fetching devnet pool quote:', error);
+        if (!cancelled) setQuote(undefined);
       } finally {
-        setLoadingQuote(false);
+        if (!cancelled) setLoadingQuote(false);
       }
     };
 
-    const timeoutId = setTimeout(fetchQuote, 500); // Debounce
-    return () => clearTimeout(timeoutId);
-  }, [amountNum, fromToken, toToken, slippage]);
+    const timeoutId = setTimeout(fetchQuote, 400); // Debounce
+    // Re-quote every 30s against fresh pool reserves
+    const refreshId = setInterval(fetchQuote, 30_000);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      clearInterval(refreshId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [amountNum, fromToken, toToken, slippage, fromMint, fromDecimals]);
 
   // Get token icon — delegates to TokenLogo with optional Jupiter API icon
   const getTokenIcon = (symbol: string, size: number = 20) => {
@@ -194,13 +180,10 @@ export const SwapForm = ({
   // Use Jupiter quote if available, otherwise fallback to simple calculation
   const estimatedReceive = (() => {
     if (quote) {
-      const toDecimals = getSymbolDecimals(
-        toToken,
-        tokenData?.get(toToken)
-      );
       const out = parseFloat(quote.outAmount || '0');
-      return out / Math.pow(10, toDecimals);
+      return out / Math.pow(10, quote.outDecimals);
     }
+    if (!toPrice) return 0;
     return amountNum * (fromPrice / toPrice) * (1 - slippage / 100);
   })();
   
@@ -287,7 +270,8 @@ export const SwapForm = ({
   };
 
   // Get available tokens that we have data for
-  const availableTokens = ['SOL', 'USDC', 'USDT', 'BONK', 'RAY', 'JUP', 'ORCA', 'mSOL', 'JitoSOL', 'PYTH'] as TokenSym[];
+  // Only tokens with real devnet liquidity (RampFi Raydium CPMM pool: SOL ↔ rUSDC)
+  const availableTokens = [...DEVNET_TRADABLE_TOKENS] as TokenSym[];
   const fiatOptions: Array<'USD' | 'VND'> = ['USD', 'VND'];
 
   // Filter tokens based on search
@@ -299,17 +283,17 @@ export const SwapForm = ({
   return (
     <>
       <div className='space-y-4'>
-        {/* Header with Ultra V2 and settings - Compact */}
+        {/* Header with Pool Status & Slippage */}
         <div className='flex items-center justify-between mb-2'>
-          <button className='flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors'>
-            <Sparkles className='h-3.5 w-3.5 text-primary' />
-            <span className='font-medium text-xs'>Ultra V2</span>
-            <Settings2 className='h-3 w-3 text-muted-foreground' />
-          </button>
+          <div className='flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20'>
+            <span className='w-1.5 h-1.5 rounded-full bg-primary animate-pulse' />
+            <span className='font-bold text-[11px] text-primary tracking-wide'>Raydium CPMM</span>
+            <span className='text-[10px] text-muted-foreground font-mono border-l border-white/10 pl-1.5'>0% Gas</span>
+          </div>
           <div className='flex items-center gap-2'>
-            <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
-              <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
-            </button>
+            <span className='px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-[10px] font-mono font-bold text-muted-foreground'>
+              Max Slippage {slippage}%
+            </span>
           </div>
         </div>
 
@@ -442,17 +426,15 @@ export const SwapForm = ({
               <span className='text-muted-foreground'>Rate</span>
               <span className='font-mono text-white'>1 {fromToken} = {(estimatedReceive / amountNum).toFixed(6)} {toToken}</span>
             </div>
-            {quote.priceImpactPct && (
-              <div className='flex items-center justify-between text-[10px]'>
-                <span className='text-muted-foreground'>Price Impact</span>
-                <span className={`font-semibold ${parseFloat(quote.priceImpactPct) > 1 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                  {parseFloat(quote.priceImpactPct).toFixed(2)}%
-                </span>
-              </div>
-            )}
+            <div className='flex items-center justify-between text-[10px]'>
+              <span className='text-muted-foreground'>Price Impact</span>
+              <span className={`font-semibold ${quote.priceImpactPct > 1 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                {quote.priceImpactPct < 0.01 ? '<0.01' : quote.priceImpactPct.toFixed(2)}%
+              </span>
+            </div>
             <div className='flex items-center justify-between text-[10px]'>
               <span className='text-muted-foreground'>Route</span>
-              <span className='text-white'>{quote.routePlan?.length ? `${quote.routePlan.length} hop${quote.routePlan.length > 1 ? 's' : ''}` : 'Direct'}</span>
+              <span className='text-white'>Raydium CPMM (devnet)</span>
             </div>
             <div className='flex items-center justify-between text-[10px]'>
               <span className='text-muted-foreground'>Gas Fee</span>
@@ -677,93 +659,76 @@ export const SwapForm = ({
 
       <SwapReviewModal
         open={reviewOpen}
-        onOpenChange={setReviewOpen}
+        onOpenChange={(v) => {
+          setReviewOpen(v);
+          if (!v && swapDone) {
+            setAmount('');
+            setSwapDone(false);
+          }
+        }}
         fromToken={fromToken}
         toToken={toToken}
         amount={amountNum}
         estimatedReceive={estimatedReceive}
-        fee={amountNum * 0.002}
+        fee={quote ? Number(quote.feeAmount) / Math.pow(10, quote.inDecimals) : 0}
         quote={quote}
         onConfirm={async () => {
+          const owner = lz.address || pubkey;
+          if (!owner || !lz.signAndSendTransaction) {
+            throw new Error('Connect your passkey wallet before swapping.');
+          }
+          if (!fromMint) throw new Error(`Unsupported token ${fromToken}`);
+
           try {
-            // Step 1: Get the swap transaction from Jupiter via store
-            const result = swapReal ? await swapReal(fromToken, toToken, amountNum, slippage) : false;
-            
-            if (!result) {
-              toast({
-                title: 'Swap Failed',
-                description: 'Failed to prepare swap transaction. Check console for details.',
-                variant: 'destructive',
-              });
-              setReviewOpen(false);
-              return;
+            // 1. Backend builds Raydium CPMM swap instructions for the vault (fresh reserves)
+            const built = await buildDevnetSwap(owner, fromMint, toRaw(amountNum), slippage * 100);
+            const instructions = built.instructions.map(toInstruction);
+            const outUi = Number(built.quote.outAmount) / Math.pow(10, built.quote.outDecimals);
+
+            // 2. Passkey signs; LazorKit paymaster sponsors the fee. The pool's lookup table
+            //    keeps the wrapped transaction in one packet (else the hook defers it).
+            const tables = await resolveLookupTables(built.lookupTables);
+            const signature = await lz.signAndSendTransaction(
+              instructions,
+              tables.length ? { addressLookupTableAccounts: tables } : undefined,
+            );
+
+            // 3. Wait for confirmation so balances reflect the swap
+            try {
+              const latest = await defaultConnection.getLatestBlockhash('confirmed');
+              await defaultConnection.confirmTransaction({ signature, ...latest }, 'confirmed');
+            } catch (confirmErr) {
+              console.warn('Swap sent, confirmation pending:', confirmErr);
             }
 
-            const swapResult = result as SwapResult;
-
-            // Step 2: Try to sign and send via LazorKit SDK (biometric passkey)
-            let signature: string | null = null;
-            let isDevnetSimulated = false;
-
-            if (lz?.signAndSendTransaction && swapResult.swapTransaction?.swapTransaction) {
-              try {
-                // Deserialize and sign the Jupiter swap transaction
-                const { VersionedTransaction } = await import('@solana/web3.js');
-                const txBuffer = Buffer.from(swapResult.swapTransaction.swapTransaction, 'base64');
-                const transaction = VersionedTransaction.deserialize(txBuffer);
-                
-                // Extract instructions and sign via LazorKit
-                signature = await lz.signAndSendTransaction(transaction);
-                console.log('✅ Swap transaction signed and sent:', signature);
-              } catch (signError: any) {
-                console.warn('⚠️ Swap signing failed (expected on Devnet — no Jupiter pools):', signError.message);
-                isDevnetSimulated = true;
-              }
-            } else {
-              console.warn('⚠️ LazorKit SDK not available or no swap transaction — simulating on Devnet');
-              isDevnetSimulated = true;
-            }
-
-            // Step 3: Record activity based on outcome
-            const activity = {
-              id: Date.now().toString(),
-              kind: 'swap' as const,
+            addActivity?.({
+              id: signature,
+              kind: 'swap',
               ts: new Date().toISOString(),
-              summary: isDevnetSimulated
-                ? `[Devnet Simulated] Swapped ${amountNum} ${fromToken} for ~${swapResult.estimatedOutput.toFixed(4)} ${toToken}`
-                : `Swapped ${amountNum} ${fromToken} for ~${swapResult.estimatedOutput.toFixed(4)} ${toToken}`,
+              summary: `Swapped ${amountNum} ${fromToken} → ${outUi.toFixed(6)} ${toToken} (Raydium devnet)`,
               amount: amountNum,
               token: fromToken,
-              status: isDevnetSimulated ? 'Simulated' : 'Success',
-              txSignature: signature || undefined,
-            };
-            addActivity?.(activity as any);
+              status: 'Success',
+              txSignature: signature,
+            } as any);
 
-            // Step 4: Notify user
-            if (isDevnetSimulated) {
-              toast({
-                title: '⚡ Swap Simulated (Devnet)',
-                description: `${amountNum} ${fromToken} → ${swapResult.estimatedOutput.toFixed(4)} ${toToken}. Jupiter pools unavailable on Devnet — swap was simulated with real pricing data.`,
-              });
-            } else {
-              toast({
-                title: '✅ Swap Confirmed On-Chain',
-                description: `${amountNum} ${fromToken} → ${swapResult.estimatedOutput.toFixed(4)} ${toToken}`,
-              });
-              // Only refresh balances on real swap
-              setTimeout(() => refreshBalances?.().catch(console.error), 3000);
-            }
+            toast({
+              title: 'Swap confirmed on-chain',
+              description: `${amountNum} ${fromToken} → ${outUi.toFixed(6)} ${toToken}`,
+            });
+            setSwapDone(true);
+            refreshBalances?.().catch(console.error);
+            setTimeout(() => refreshBalances?.().catch(console.error), 4000);
+            return signature;
           } catch (err: any) {
             console.error('Swap flow error:', err);
             toast({
-              title: 'Swap Error',
+              title: 'Swap failed',
               description: err?.message || 'An unexpected error occurred during the swap.',
               variant: 'destructive',
             });
+            throw err;
           }
-          
-          setReviewOpen(false);
-          setAmount('');
         }}
       />
     </>

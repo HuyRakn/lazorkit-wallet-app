@@ -17,7 +17,7 @@ export type TokenSym =
   | 'PYTH';
 
 export type PaymentMethod = 'card' | 'applepay' | 'vnpay';
-export type ActivityKind = 'onramp' | 'swap' | 'send' | 'deposit' | 'mint' | 'receive' | 'buy';
+export type ActivityKind = 'onramp' | 'swap' | 'send' | 'deposit' | 'mint' | 'receive' | 'buy' | 'other';
 
 export interface TokenHolding {
   symbol: TokenSym;

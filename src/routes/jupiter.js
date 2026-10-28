@@ -6,10 +6,11 @@ const router = express.Router();
 const DEVNET_TO_MAINNET_MINTS = {
   'So11111111111111111111111111111111111111112': 'So11111111111111111111111111111111111111112',
   '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU': 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // Devnet USDC -> Mainnet USDC
+  ...(process.env.TOKEN_MINT ? { [process.env.TOKEN_MINT]: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' } : {}), // RampFi rUSDC -> Mainnet USDC
   'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB': 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', // USDT
-  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'DezXAZ8z7PnrnRJjz3wX4mP77h2mk7zReoY5V3443K51', // Devnet BONK -> Mainnet BONK
-  '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': '4k3Dyjzv37sKk8AhiHc74E79wDzU15xx4GZ5NXZ474n', // Devnet RAY -> Mainnet RAY
-  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUPyiwrYdXYwt6kXJ64C64xaB6NPTXj64E24gHw8A9j', // Devnet JUP -> Mainnet JUP
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263': 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', // BONK
+  '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R': '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R', // RAY
+  'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN': 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN', // JUP
   'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE': 'orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektZE',
   'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So': 'mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So',
   'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn': 'J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn',

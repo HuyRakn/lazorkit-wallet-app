@@ -24,7 +24,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Sparkles,
+  Hexagon,
+  PlusCircle,
+  ShieldCheck,
   Layers,
   Cpu,
   ExternalLink,
@@ -254,7 +256,7 @@ export function NftCreatorView() {
             : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.02]'
             }`}
         >
-          <Sparkles className="h-3.5 w-3.5" /> Mint New
+          <PlusCircle className="h-3.5 w-3.5" /> Mint New
         </button>
         <button
           onClick={() => setActiveStudioTab('collection')}
@@ -411,36 +413,66 @@ export function NftCreatorView() {
           </div>
 
           {/* Right Preview */}
-          <div className="lg:col-span-2 space-y-4">
-            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Preview Card</Label>
-            <div className="group relative rounded-2xl bg-gradient-to-br from-indigo-500/5 via-purple-500/10 to-pink-500/5 p-[1px] shadow-md transition duration-500 hover:scale-[1.01] h-[560px]">
-              <div className="h-full w-full bg-[#0d0d0f]/90 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden backdrop-blur-md border border-border/60">
-                <div className="flex justify-between items-start">
-                  <span className="px-2 py-0.5 rounded bg-white/5 border border-border text-[10px] text-muted-foreground font-black">
-                    {nftType === 'standard' ? REGULAR_NFT_SYMBOL : CNFT_SYMBOL}
+          <div className="lg:col-span-2 space-y-3">
+            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Live Asset Preview</Label>
+            <div className="group relative rounded-2xl bg-gradient-to-br from-primary/20 via-accent/15 to-emerald-500/10 p-[1px] shadow-xl transition duration-500 hover:border-primary/40">
+              <div className="w-full bg-[#090d16]/95 rounded-2xl p-6 flex flex-col justify-between relative overflow-hidden backdrop-blur-xl border border-white/10 space-y-6">
+                <div className="absolute -top-16 -right-16 w-40 h-40 rounded-full bg-primary/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 -left-16 w-40 h-40 rounded-full bg-accent/10 blur-3xl pointer-events-none" />
+
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/25 text-[10px] text-primary font-mono font-extrabold tracking-wider uppercase">
+                    {nftType === 'standard' ? REGULAR_NFT_SYMBOL : CNFT_SYMBOL} • {nftType === 'standard' ? 'Metaplex 1/1' : 'Bubblegum cNFT'}
                   </span>
-                  <span className="text-[10px] text-muted-foreground/80 flex items-center gap-1 font-semibold">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> DEVNET
+                  <span className="text-[10px] text-emerald-400 flex items-center gap-1.5 font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> DEVNET
                   </span>
                 </div>
 
-                <div className="relative w-28 h-28 mx-auto flex items-center justify-center my-8">
-                  <div className="absolute inset-0 bg-primary/10 rounded-full blur-lg" />
-                  <div className="w-20 h-20 rounded-full border border-border bg-white/5 flex items-center justify-center">
-                    <Sparkles className="w-10 h-10 text-primary" />
+                {/* Geometric Artwork Stage */}
+                <div className="relative w-full aspect-[4/3] rounded-xl border border-white/10 bg-gradient-to-br from-[#0c1322] via-[#090d16] to-[#0a191e] flex flex-col items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(22,255,187,0.12),transparent_65%)]" />
+                  <div className="relative w-20 h-20 rounded-2xl border border-primary/30 bg-primary/10 flex items-center justify-center shadow-[0_0_30px_rgba(22,255,187,0.15)] group-hover:scale-105 transition-transform duration-500">
+                    {nftType === 'compressed' ? (
+                      <Cpu className="w-9 h-9 text-primary" />
+                    ) : (
+                      <Hexagon className="w-9 h-9 text-primary" />
+                    )}
                   </div>
+                  <span className="mt-3 text-[10px] font-mono uppercase tracking-widest text-muted-foreground/70">
+                    {nftType === 'compressed' ? 'Merkle Tree State Compression' : 'SPL Master Edition'}
+                  </span>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="text-base font-bold truncate text-foreground leading-none">
-                    {name.trim() || 'Untitled Artwork'}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground line-clamp-2 min-h-[30px] leading-relaxed">
-                    {description.trim() || 'Holographic preview updates as you compose.'}
-                  </p>
-                  <div className="pt-2 border-t border-border/40 flex justify-between items-center text-[10px] text-muted-foreground/60 font-mono">
-                    <span>Author: {pubkey ? `${pubkey.slice(0, 4)}...` : 'Anonymous'}</span>
-                    <span className="text-primary font-bold">100% GASLESS</span>
+                {/* Metadata & Attributes */}
+                <div className="space-y-3 relative z-10">
+                  <div>
+                    <h3 className="text-base font-extrabold truncate text-white leading-tight">
+                      {name.trim() || 'Untitled Digital Asset'}
+                    </h3>
+                    <p className="text-xs text-muted-foreground line-clamp-2 min-h-[34px] leading-relaxed mt-1">
+                      {description.trim() || 'On-chain metadata preview updates in real time as you configure your asset.'}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Storage Standard</span>
+                      <span className="text-xs font-bold text-white font-mono">
+                        {nftType === 'compressed' ? 'Concurrent Merkle' : 'Token Metadata'}
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">Network Fee</span>
+                      <span className="text-xs font-bold text-primary font-mono flex items-center gap-1">
+                        <ShieldCheck className="w-3.5 h-3.5" /> 0.00 SOL
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-white/10 flex justify-between items-center text-[10px] text-muted-foreground font-mono">
+                    <span>Creator: {pubkey ? `${pubkey.slice(0, 4)}...${pubkey.slice(-4)}` : 'Unconnected'}</span>
+                    <span className="text-primary font-bold">PAYMASTER SPONSORED</span>
                   </div>
                 </div>
               </div>

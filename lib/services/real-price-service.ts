@@ -31,9 +31,9 @@ const TV_SYMBOLS: Record<string, string> = {
 
 const MAINNET_MINTS: Record<string, string> = {
   SOL: 'So11111111111111111111111111111111111111112',
-  JUP: 'JUPyiwrYdXYwt6kXJ64C64xaB6NPTXj64E24gHw8A9j',
-  RAY: '4k3Dyjzv37sKk8AhiHc74E79wDzU15xx4GZ5NXZ474n',
-  BONK: 'DezXAZ8z7PnrnRJjz3wX4mP77h2mk7zReoY5V3443K51',
+  JUP: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN',
+  RAY: '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R',
+  BONK: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
   USDC: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   USDT: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB',
 };
@@ -63,17 +63,20 @@ export async function fetchLivePrices(): Promise<Record<string, LiveTokenPrice>>
 
   try {
     // 1. Fetch Solana tokens from DexScreener API
+    // 2. Fetch BTC & ETH from CoinGecko (Jupiter price v2 is deprecated and blocked by CORS)
+    // Each source fails independently so one outage doesn't discard the other.
     const solanaMints = Object.values(MAINNET_MINTS).join(',');
-    const dexResponse = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${solanaMints}`);
-
-    // 2. Fetch BTC, ETH, and other non-Solana tokens from Jupiter Price API
-    const jupIds = 'BTC,ETH';
-    const jupResponse = await fetch(`https://api.jup.ag/price/v2?ids=${jupIds}`);
+    const [dexSettled, cgSettled] = await Promise.allSettled([
+      fetch(`https://api.dexscreener.com/latest/dex/tokens/${solanaMints}`),
+      fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true'),
+    ]);
+    const dexResponse = dexSettled.status === 'fulfilled' ? dexSettled.value : null;
+    const cgResponse = cgSettled.status === 'fulfilled' ? cgSettled.value : null;
 
     const result: Record<string, LiveTokenPrice> = { ...defaultPrices };
 
     // Process DexScreener data
-    if (dexResponse.ok) {
+    if (dexResponse?.ok) {
       const dexJson = await dexResponse.json();
       const pairs = dexJson.pairs || [];
 
@@ -100,17 +103,18 @@ export async function fetchLivePrices(): Promise<Record<string, LiveTokenPrice>>
       }
     }
 
-    // Process Jupiter Price API data for BTC & ETH
-    if (jupResponse.ok) {
-      const jupJson = await jupResponse.json();
-      const data = jupJson.data || {};
-      for (const symbol of ['BTC', 'ETH']) {
-        if (data[symbol]?.price) {
+    // Process CoinGecko data for BTC & ETH
+    if (cgResponse?.ok) {
+      const cgJson = await cgResponse.json();
+      const ids: Record<string, string> = { BTC: 'bitcoin', ETH: 'ethereum' };
+      for (const [symbol, id] of Object.entries(ids)) {
+        const entry = cgJson?.[id];
+        if (entry?.usd) {
           result[symbol] = {
             ...result[symbol],
-            priceUsd: parseFloat(data[symbol].price),
-            // Fallback change24h to a small real-time micro-fluctuation to make charts feel responsive
-            change24h: defaultPrices[symbol].change24h + (Math.sin(now / 30000) * 0.2),
+            priceUsd: Number(entry.usd),
+            change24h: Number(entry.usd_24h_change ?? defaultPrices[symbol].change24h),
+            volume24h: Number(entry.usd_24h_vol ?? defaultPrices[symbol].volume24h),
           };
         }
       }

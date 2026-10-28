@@ -5,9 +5,10 @@ import { Card, CardContent } from './ui/card';
 import { EmptyState } from './ui/empty-state';
 import { 
   Clock, ExternalLink, CheckCircle2, XCircle, Loader2, 
-  ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Filter, RefreshCcw 
+  ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Filter, RefreshCcw, Layers, Landmark, Droplets 
 } from 'lucide-react';
 import { useWalletStore, Activity, ActivityKind } from '@/lib/store/wallet';
+import { explorerTxUrl } from '@/lib/utils/explorer';
 
 /** Relative time formatter */
 function timeAgo(ts: string): string {
@@ -35,12 +36,18 @@ function getActivityMeta(kind: ActivityKind) {
       return { icon: ArrowLeftRight, color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Swap' };
     case 'buy':
       return { icon: ArrowDownLeft, color: 'text-primary', bg: 'bg-primary/10', label: 'Buy' };
+    case 'onramp':
+      return { icon: Landmark, color: 'text-primary', bg: 'bg-primary/10', label: 'Onramp' };
+    case 'deposit':
+      return { icon: Droplets, color: 'text-cyan-400', bg: 'bg-cyan-500/10', label: 'Deposit' };
+    case 'mint':
+      return { icon: Layers, color: 'text-sky-400', bg: 'bg-sky-500/10', label: 'NFT Mint' };
     default:
       return { icon: Clock, color: 'text-muted-foreground', bg: 'bg-muted/20', label: 'Transaction' };
   }
 }
 
-type FilterType = 'all' | 'send' | 'receive' | 'swap';
+type FilterType = 'all' | 'send' | 'receive' | 'swap' | 'mint';
 
 export function AssetsActivity({ maxItems = 20 }: { maxItems?: number } = {}) {
   const { activity, fetchTransactionHistory, pubkey } = useWalletStore();
@@ -82,6 +89,7 @@ export function AssetsActivity({ maxItems = 20 }: { maxItems?: number } = {}) {
   // Filter activities
   const filteredActivity = useMemo(() => {
     if (filter === 'all') return activity;
+    if (filter === 'receive') return activity.filter(a => ['receive', 'deposit', 'onramp', 'buy'].includes(a.kind));
     return activity.filter(a => a.kind === filter);
   }, [activity, filter]);
 
@@ -90,6 +98,7 @@ export function AssetsActivity({ maxItems = 20 }: { maxItems?: number } = {}) {
     { key: 'send', label: 'Sends' },
     { key: 'receive', label: 'Receives' },
     { key: 'swap', label: 'Swaps' },
+    { key: 'mint', label: 'NFTs' },
   ];
 
   if (loading) {
@@ -192,10 +201,10 @@ export function AssetsActivity({ maxItems = 20 }: { maxItems?: number } = {}) {
                       </span>
                       {txSig && (
                         <a
-                          href={`https://explorer.solana.com/tx/${txSig}?cluster=devnet`}
+                          href={explorerTxUrl(txSig)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 rounded-md hover:bg-muted/20 text-muted-foreground/40 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
+                          className="p-1 rounded-md hover:bg-muted/20 text-muted-foreground/40 hover:text-primary transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                           title="View on Solana Explorer"
                         >
                           <ExternalLink className='h-3.5 w-3.5' />

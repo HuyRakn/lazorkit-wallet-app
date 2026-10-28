@@ -46,7 +46,8 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-app.use(express.json());
+// Keep the raw body: payment webhooks are HMAC-signed over the exact bytes sent
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 
 // Trust proxy for accurate IP addresses
@@ -58,13 +59,25 @@ const deviceImportRouter = require('./src/routes/device-import');
 const nftMetadataRouter = require('./src/routes/nft-metadata');
 const postsRouter = require('./src/routes/posts');
 const newsRouter = require('./src/routes/news');
+const faucetRouter = require('./src/routes/faucet');
+const swapRouter = require('./src/routes/swap');
+const authRouter = require('./src/routes/auth');
+const lazorkitRouter = require('./src/routes/lazorkit');
+const feedRouter = require('./src/routes/feed');
+const paymasterRouter = require('./src/routes/paymaster');
 
+app.use('/api/paymaster', paymasterRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/lazorkit', lazorkitRouter);
+app.use('/api/feed', feedRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/jupiter', jupiterRouter);
 app.use('/api/device-import', deviceImportRouter);
 app.use('/api/nft-metadata', nftMetadataRouter);
 app.use('/api/posts', postsRouter);
 app.use('/api/news', newsRouter);
+app.use('/api/faucet', faucetRouter);
+app.use('/api/swap', swapRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -77,6 +90,10 @@ app.get('/api/health', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
+  // Client errors from body-parser (malformed JSON, too large…)
+  if (err && (err.type === 'entity.parse.failed' || err.status === 400 || err.status === 413)) {
+    return res.status(err.status || 400).json({ error: 'Invalid request body' });
+  }
   console.error('Server error:', err);
   res.status(500).json({
     error: 'Internal server error',

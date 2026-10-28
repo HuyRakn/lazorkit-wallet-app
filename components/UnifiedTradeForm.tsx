@@ -7,6 +7,8 @@ import { SwapForm } from '@/components/swap-form';
 import { PriceChart } from '@/components/market/price-chart';
 import { JupiterToken } from '@/lib/services/jupiter';
 import { useWalletStore } from '@/lib/store/wallet';
+import { TokenLogo } from '@/components/ui/token-logo';
+import { formatCurrency } from '@/lib/utils/format';
 import { ArrowLeftRight, CreditCard, ShieldCheck, Zap, Info, Wallet, BarChart2 } from 'lucide-react';
 
 type Mode = 'buy' | 'swap';
@@ -151,25 +153,48 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
         <div className="hidden lg:flex flex-col w-[320px] shrink-0 space-y-4 lg:pt-[64px]">
           {/* Quick Stats */}
           <div className="premium-depth-card rounded-2xl p-5 space-y-4">
-            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Portfolio Summary</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Portfolio Summary</h4>
+              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-bold">
+                On-Chain
+              </span>
+            </div>
             <div className="section-divider" />
             {tokens.length > 0 ? (
-              <div className="space-y-3">
-                {tokens.slice(0, 5).map((token: any) => (
-                  <div key={token.symbol || token.mint} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-primary/10 border border-border/30 flex items-center justify-center text-[9px] font-bold text-primary">
-                        {(token.symbol || '?').slice(0, 2)}
+              <div className="space-y-2.5">
+                {tokens.slice(0, 5).map((token: any) => {
+                  const jup = tokenData?.get(token.symbol);
+                  const usdPrice = jup?.usdPrice ?? token.priceUsd ?? 0;
+                  const usdValue = (Number(token.amount) || 0) * usdPrice;
+                  return (
+                    <div
+                      key={token.symbol || token.mint}
+                      className="flex items-center justify-between p-2 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-primary/25 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full overflow-hidden bg-black/40 border border-white/10 flex items-center justify-center shrink-0">
+                          <TokenLogo symbol={token.symbol || 'SOL'} size={24} />
+                        </div>
+                        <div>
+                          <span className="text-xs font-extrabold text-white block leading-tight">
+                            {token.symbol || 'Unknown'}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {formatCurrency(usdPrice, 'USD')}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-xs font-bold text-foreground">{token.symbol || 'Unknown'}</span>
+                      <div className="text-right">
+                        <span className="text-xs font-mono font-bold text-white block leading-tight">
+                          {typeof token.amount === 'number' ? token.amount.toFixed(4) : token.amount}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {formatCurrency(usdValue, 'USD')}
+                        </span>
                       </div>
                     </div>
-                    <span className="text-xs font-mono font-bold text-foreground">
-                      {typeof token.amount === 'number' ? token.amount.toFixed(4) : token.amount}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
                 {tokens.length > 5 && (
                   <p className="text-[9px] text-muted-foreground text-center pt-1">
                     +{tokens.length - 5} more tokens
@@ -186,7 +211,12 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
 
           {/* Network Info */}
           <div className="premium-depth-card rounded-2xl p-5 space-y-3">
-            <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Network</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Network & Routing</h4>
+              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Active
+              </span>
+            </div>
             <div className="section-divider" />
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
@@ -195,15 +225,17 @@ export const UnifiedTradeForm = ({ tokenData }: UnifiedTradeFormProps) => {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Cluster</span>
-                <span className="font-bold text-purple-400">Devnet</span>
+                <span className="font-bold text-purple-400">Devnet (Helius RPC)</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Gas</span>
-                <span className="font-bold text-primary">Sponsored</span>
+                <span className="text-muted-foreground">Paymaster</span>
+                <span className="font-bold text-primary flex items-center gap-1">
+                  <Zap className="w-3 h-3" /> Sponsored (0 SOL)
+                </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Swap Router</span>
-                <span className="font-bold text-foreground">Jupiter v6</span>
+                <span className="text-muted-foreground">AMM Pool</span>
+                <span className="font-bold text-foreground">Raydium CPMM</span>
               </div>
             </div>
           </div>

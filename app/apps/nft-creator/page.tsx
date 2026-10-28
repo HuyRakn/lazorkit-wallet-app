@@ -25,7 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
   ArrowLeft, 
-  Sparkles, 
+  Hexagon, 
+  PlusCircle,
   Layers, 
   Cpu, 
   ExternalLink, 
@@ -314,7 +315,7 @@ export default function NftCreatorPage() {
           <Card className="p-6 md:p-8 bg-white/5 border-white/10 backdrop-blur-md space-y-6">
             <div className="space-y-1">
               <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-yellow-400" /> Mint your NFT
+                <PlusCircle className="w-5 h-5 text-primary" /> Mint your NFT
               </h3>
               <p className="text-xs text-gray-400">
                 {nftType === 'compressed' 
@@ -470,11 +471,11 @@ export default function NftCreatorPage() {
                 </span>
               </div>
 
-              {/* Central Glowing Orb placeholder */}
+              {/* Central Emblem placeholder */}
               <div className="relative w-36 h-36 mx-auto flex items-center justify-center my-4">
-                <div className="absolute inset-0 bg-gradient-to-tr from-primary to-purple-600 rounded-full opacity-20 blur-xl group-hover:opacity-40 animate-pulse transition duration-500" />
-                <div className="w-24 h-24 rounded-full border border-white/15 bg-white/5 flex items-center justify-center relative overflow-hidden backdrop-blur-sm group-hover:rotate-12 transition-all duration-700">
-                  <Sparkles className="w-10 h-10 text-primary group-hover:scale-110 transition duration-500" />
+                <div className="absolute inset-0 bg-gradient-to-tr from-primary to-accent rounded-full opacity-20 blur-xl group-hover:opacity-40 animate-pulse transition duration-500" />
+                <div className="w-24 h-24 rounded-2xl border border-primary/30 bg-primary/10 flex items-center justify-center relative overflow-hidden backdrop-blur-sm group-hover:scale-105 transition-all duration-500">
+                  <Hexagon className="w-10 h-10 text-primary transition duration-500" />
                 </div>
               </div>
 

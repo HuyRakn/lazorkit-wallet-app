@@ -8,38 +8,23 @@ import { CopyButton } from '@/components/ui/copy-button';
 import { useWalletStore } from '@/lib/store/wallet';
 import { formatCurrency } from '@/lib/utils/format';
 
+/**
+ * The payment provider (sandbox checkout or a real provider's signed webhook) settles
+ * the order; this return page only waits for that and reads the payout.
+ */
 async function notifyBackendSuccess(reference: string) {
-  try {
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
-    console.log('📤 Sending to backend:', {
-      url: `${apiBase}/api/orders/callback/success`,
-      reference
-    });
-    
-    const res = await fetch(`${apiBase}/api/orders/callback/success`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // CHỈ GỬI REFERENCE - Backend sẽ lấy passkeyData từ DB
-      body: JSON.stringify({ reference }),
-    });
-    
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error('❌ Backend response error:', {
-        status: res.status,
-        statusText: res.statusText,
-        body: errorText
-      });
-      throw new Error(`Backend error: ${res.status} ${errorText}`);
+  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+  for (let i = 0; i < 20; i++) {
+    const res = await fetch(`${apiBase}/api/orders/${encodeURIComponent(reference)}`, { cache: 'no-store' });
+    if (res.status === 404) throw new Error('Order not found');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === 'success') return data;
+      if (data.status === 'failed') throw new Error('Payment failed or expired');
     }
-    
-    const data = await res.json();
-    console.log('✅ Backend response:', data);
-    return data;
-  } catch (e) {
-    console.error('❌ Notify backend error:', e);
-    throw e;
+    await new Promise((r) => setTimeout(r, 1500));
   }
+  throw new Error('Payment is still being processed. Check your activity in a moment.');
 }
 
 async function fetchOrderWallet(reference: string): Promise<{ walletAddress?: string; status?: string } | null> {

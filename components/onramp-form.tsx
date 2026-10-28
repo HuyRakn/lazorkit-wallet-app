@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings2, ChevronDown, Search, X } from 'lucide-react';
+import { ChevronDown, Search, X, ShieldCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { TokenLogo } from './ui/token-logo';
@@ -23,7 +23,7 @@ import {
   generateOrderId,
 } from '@/lib/utils/format';
 import { t } from '@/lib/i18n';
-import { JupiterToken, TOKEN_ADDRESSES } from '@/lib/services/jupiter';
+import { JupiterToken, TOKEN_ADDRESSES, DEVNET_TRADABLE_TOKENS } from '@/lib/services/jupiter';
 import { useWallet } from '@/hooks/use-lazorkit-wallet';
 
 interface OnRampFormProps {
@@ -48,7 +48,7 @@ const currencyIcons: Record<Fiat, string> = {
 
 export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCurrency, onTokenChange }: OnRampFormProps) => {
   const { rateUsdToVnd } = useWalletStore();
-  const wallet = useWallet() as any;
+  const wallet = useWallet();
   const router = useRouter();
   
   const [fromCurrency, setFromCurrency] = useState<Fiat>(initialFromCurrency || 'USD');
@@ -225,7 +225,8 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
     return parts.join('.');
   };
 
-  const allTokens: TokenSym[] = ['SOL','USDC','USDT','BONK','RAY','JUP','ORCA','mSOL','JitoSOL','PYTH'];
+  // Only tokens the backend can actually deliver on devnet (rUSDC, native SOL)
+  const allTokens: TokenSym[] = [...DEVNET_TRADABLE_TOKENS];
   const filteredTokens = allTokens.filter(token => 
     token.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -234,10 +235,13 @@ export const OnRampForm = ({ onPreview, tokenData, onSwitchToSwap, initialFromCu
     <>
       <div className='space-y-4'>
         <div className='flex items-center justify-between mb-2'>
-          <div className='text-sm font-medium'>{t('onRamp.title')}</div>
-          <button className='p-1.5 rounded-lg hover:bg-muted/50 transition-colors'>
-            <Settings2 className='h-3.5 w-3.5 text-muted-foreground' />
-          </button>
+          <div className='flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20'>
+            <ShieldCheck className='h-3.5 w-3.5 text-primary' />
+            <span className='font-bold text-[11px] text-primary tracking-wide'>VietQR • Napas 24/7</span>
+          </div>
+          <span className='px-2 py-0.5 rounded-md bg-white/[0.04] border border-white/10 text-[10px] font-mono font-bold text-muted-foreground'>
+            1 USD = {rateUsdToVnd.toLocaleString('en-US')} VND
+          </span>
         </div>
 
         <div className='relative rounded-2xl overflow-hidden border border-white/10 premium-depth-inset bg-black/20'>

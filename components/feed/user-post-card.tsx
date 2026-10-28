@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, MessageCircle, Send, Share2, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, Send, Share2, ShieldCheck } from 'lucide-react';
 import { useWalletStore } from '@/lib/store/wallet';
 import { Blockie } from '@/components/ui/blockie';
 import { formatAddress } from '@/lib/utils/format';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSiws } from '@/hooks/use-siws';
 
 interface UserPostCardProps {
   post: {
@@ -33,7 +34,7 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
   const [commenting, setCommenting] = useState(false);
   const [liking, setLiking] = useState(false);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://localhost:3001';
+  const { authedFetch } = useSiws();
   const isLiked = pubkey ? post.likes.includes(pubkey) : false;
 
   const handleLike = async () => {
@@ -41,11 +42,7 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
     setLiking(true);
 
     try {
-      const response = await fetch(`${apiBase}/api/posts/${post._id}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: pubkey }),
-      });
+      const response = await authedFetch(`/api/posts/${post._id}/like`, { method: 'POST' });
 
       if (response.ok) {
         const data = await response.json();
@@ -69,13 +66,9 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
     setCommenting(true);
 
     try {
-      const response = await fetch(`${apiBase}/api/posts/${post._id}/comment`, {
+      const response = await authedFetch(`/api/posts/${post._id}/comment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          walletAddress: pubkey,
-          content: commentText.trim(),
-        }),
+        body: JSON.stringify({ content: commentText.trim() }),
       });
 
       if (response.ok) {
@@ -129,8 +122,8 @@ export function UserPostCard({ post, onPostUpdated }: UserPostCardProps) {
 
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-muted-foreground/80 font-medium">{formatTime(post.createdAt)}</span>
-          <div className="w-6 h-6 rounded-md bg-accent/10 border border-accent/20 flex items-center justify-center text-accent">
-            <Sparkles className="h-3 w-3" />
+          <div className="w-6 h-6 rounded-md bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <ShieldCheck className="h-3 w-3" />
           </div>
         </div>
       </div>

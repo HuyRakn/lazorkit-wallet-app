@@ -12,16 +12,11 @@ import {
 } from '@/lib/types';
 import {
   getTokenBalance,
-  getAllTokenBalances,
-  getSwapQuote,
-  getSwapTransaction,
   defaultConnection,
   TOKEN_ADDRESSES,
-  TOKEN_DECIMALS
 } from '@/lib/services/jupiter';
 import { fetchRealTokenData } from '@/lib/services/real-token-service';
-import { getBackendBalance } from '@/lib/services/backend-balance';
-import { Connection } from '@solana/web3.js';
+import { fetchParsedHistory } from '@/lib/services/tx-history';
 
 // Re-export types for backward compatibility
 export type {
@@ -64,15 +59,6 @@ export const ECOSYSTEM_APPS: AppCard[] = [
   { id: 'helium', name: 'Helium', intro: 'Decentralized wireless infrastructure network built on Solana blockchain', category: 'Social', tags: ['IoT', 'Mobile', 'Wireless'], image: 'https://assets.coingecko.com/coins/images/13554/large/hnt.png', banner: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=600&auto=format&fit=crop&q=80', website: 'https://helium.com', verified: true },
 ];
 
-/** Result from swapReal() — contains data needed for component to sign via LazorKit SDK */
-export interface SwapResult {
-  swapTransaction: any;
-  quote: any;
-  estimatedOutput: number;
-  fromToken: TokenSym;
-  toToken: TokenSym;
-  amount: number;
-}
 
 export interface WalletState {
   hasPasskey: boolean;
@@ -111,7 +97,6 @@ export interface WalletState {
     token: TokenSym,
     orderId: string
   ) => void;
-  swapReal: (fromToken: TokenSym, toToken: TokenSym, amount: number, slippage?: number) => Promise<SwapResult | false>;
   addActivity: (activity: Activity) => void;
   resetDemoData: () => void;
   // Blockchain functions
@@ -400,114 +385,30 @@ export const useWalletStore = create<WalletState>()(
           }
         },
 
-        swapReal: async (fromToken: TokenSym, toToken: TokenSym, amount: number, slippage?: number) => {
-          const state = get();
-          if (!state.pubkey) {
-            console.warn('No pubkey available for swapReal');
-            return false;
-          }
-
-          if (!fromToken || !toToken || !amount || amount <= 0) {
-            console.warn('Invalid swap parameters:', { fromToken, toToken, amount });
-            return false;
-          }
-
-          try {
-            const fromMint = (TOKEN_ADDRESSES as Record<string, string>)[fromToken];
-            const toMint = (TOKEN_ADDRESSES as Record<string, string>)[toToken];
-
-            if (!fromMint || !toMint) {
-              console.error('Invalid token addresses:', { fromToken, toToken, fromMint, toMint });
-              return false;
-            }
-
-            if (typeof amount !== 'number' || !isFinite(amount) || amount <= 0) {
-              console.error('Invalid amount:', amount);
-              return false;
-            }
-
-            const decimals = TOKEN_DECIMALS[fromToken as keyof typeof TOKEN_DECIMALS] ?? 9;
-            const rawAmount = Math.round(amount * Math.pow(10, decimals));
-
-            // Get Jupiter swap quote (uses Mainnet API for price discovery)
-            const slippageBps = slippage ? Math.round(slippage * 100) : 50;
-            const quote = await getSwapQuote(fromMint, toMint, rawAmount, slippageBps);
-            if (!quote || typeof quote !== 'object') {
-              console.error('Failed to get swap quote:', quote);
-              return false;
-            }
-
-            // Get Jupiter swap serialized transaction
-            const swapTransaction = await getSwapTransaction(quote, state.pubkey);
-            if (!swapTransaction || typeof swapTransaction !== 'object') {
-              console.error('Failed to get swap transaction:', swapTransaction);
-              return false;
-            }
-
-
-            // Calculate estimated output for UI display
-            const toDecimals = TOKEN_DECIMALS[toToken as keyof typeof TOKEN_DECIMALS] ?? 9;
-            const estimatedOutput = parseFloat(quote.outAmount || '0') / Math.pow(10, toDecimals);
-
-            // Return the transaction data for the component to sign via LazorKit SDK
-            // Activity will be recorded AFTER the component confirms the signature
-            return {
-              swapTransaction,
-              quote,
-              estimatedOutput,
-              fromToken,
-              toToken,
-              amount,
-            };
-          } catch (error) {
-            console.error('Error preparing swap:', error);
-
-            // Record failed swap activity
-            const failedActivity: Activity = {
-              id: Date.now().toString(),
-              kind: 'swap',
-              ts: new Date().toISOString(),
-              summary: `Swap ${amount} ${fromToken} → ${toToken} failed: ${(error as Error)?.message || 'Unknown error'}`,
-              amount,
-              token: fromToken,
-              status: 'Failed',
-            };
-            set({ activity: [failedActivity, ...get().activity] });
-
-            return false;
-          }
-        },
-
-        // Fetch real transaction history from Solana Devnet
+        // Fetch + parse real transaction history from Solana devnet
         fetchTransactionHistory: async () => {
           const state = get();
           if (!state.pubkey) return;
 
           try {
-            const { PublicKey } = await import('@solana/web3.js');
-            const pubkey = new PublicKey(state.pubkey);
-            const signatures = await defaultConnection.getSignaturesForAddress(pubkey, { limit: 20 });
+            const owner = state.pubkey;
+            const chainActivities = await fetchParsedHistory(defaultConnection, owner, 25);
+            if (get().pubkey !== owner) return; // wallet switched meanwhile
 
-            const chainActivities: Activity[] = signatures.map((sig) => ({
-              id: sig.signature,
-              kind: 'send' as ActivityKind,
-              ts: sig.blockTime ? new Date(sig.blockTime * 1000).toISOString() : new Date().toISOString(),
-              summary: sig.err ? `Failed transaction` : `On-chain transaction confirmed`,
-              txSignature: sig.signature,
-              status: sig.err ? 'Failed' as const : 'Success' as const,
-            }));
-
-            // Merge with existing activities, avoiding duplicates
-            const existingIds = new Set(state.activity.map(a => a.id));
-            const newActivities = chainActivities.filter(a => !existingIds.has(a.id));
-
-            if (newActivities.length > 0) {
-              set({
-                activity: [...newActivities, ...state.activity].sort((a, b) =>
-                  new Date(b.ts).getTime() - new Date(a.ts).getTime()
-                )
-              });
+            // On-chain parse wins over older local/generic entries with the same signature,
+            // except onramp entries that carry an order id.
+            const byId = new Map(get().activity.map((a) => [a.id, a]));
+            for (const a of chainActivities) {
+              const existing = byId.get(a.id);
+              if (existing?.orderId) continue;
+              byId.set(a.id, existing && a.status === 'Pending' ? existing : a);
             }
+
+            set({
+              activity: [...byId.values()]
+                .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+                .slice(0, 100),
+            });
           } catch (error) {
             console.warn('Failed to fetch transaction history:', error);
           }

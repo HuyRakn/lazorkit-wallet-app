@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, CreditCard, Send, Image, ShieldAlert, Settings, Compass, BarChart3, Fingerprint, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, CreditCard, Send, Image, ShieldAlert, Settings, Compass, BarChart3, Fingerprint, LogOut, ChevronLeft, ChevronRight, Coins } from 'lucide-react';
 import { useWalletStore } from '@/lib/store/wallet';
 import { useWallet } from '@/hooks/use-lazorkit-wallet';
 import { motion } from 'framer-motion';
@@ -39,6 +39,7 @@ export function SidebarNav({
     { id: 'market', label: 'Markets', icon: BarChart3 },
     { id: 'buy', label: 'Buy & Swap', icon: CreditCard },
     { id: 'send', label: 'Transfers', icon: Send },
+    { id: 'stake', label: 'Staking', icon: Coins },
     { id: 'apps', label: 'Apps', icon: Compass },
     { id: 'nft', label: 'NFT Studio', icon: Image },
     { id: 'devices', label: 'Security', icon: ShieldAlert },
@@ -125,7 +126,18 @@ export function SidebarNav({
       </nav>
 
       {/* Bottom Actions */}
-      <div className="flex flex-col items-center gap-3.5 mb-2 w-full px-2">
+      <div className="flex flex-col items-center gap-2.5 mb-2 w-full px-3">
+        {pubkey && !collapsed && (
+          <div className="w-full px-3 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_#16ffbb] shrink-0" />
+              <span className="text-[10px] font-bold text-white/80 truncate">Passkey P-256</span>
+            </div>
+            <span className="text-[9px] font-mono font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+              v2 PDA
+            </span>
+          </div>
+        )}
         {/* Auth status icon */}
         {pubkey ? (
           <motion.button

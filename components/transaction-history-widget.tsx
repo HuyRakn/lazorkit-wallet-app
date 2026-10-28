@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useWalletStore } from '@/lib/store/wallet';
-import { ExternalLink, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Sparkles, History } from 'lucide-react';
+import { ExternalLink, ArrowUpRight, ArrowDownLeft, ArrowLeftRight, Layers, History } from 'lucide-react';
 
 export function TransactionHistoryWidget() {
   const { activity, pubkey } = useWalletStore();
@@ -26,8 +26,10 @@ export function TransactionHistoryWidget() {
     switch (kind) {
       case 'send': return <ArrowUpRight className="h-4 w-4" />;
       case 'swap': return <ArrowLeftRight className="h-4 w-4" />;
+      case 'receive':
+      case 'buy':
       case 'onramp': return <ArrowDownLeft className="h-4 w-4" />;
-      default: return <Sparkles className="h-4 w-4" />;
+      default: return <Layers className="h-4 w-4" />;
     }
   };
 

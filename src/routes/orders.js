@@ -1,248 +1,71 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const Order = require('../models/Order');
-const { transferSplTokenToUser } = require('../utils/transfer');
-const { Connection, PublicKey, Keypair, Transaction } = require('@solana/web3.js');
-const bs58 = require('bs58');
-let BN;
-try { BN = require('bn.js'); } catch (_) { BN = null; }
+const { transferSplTokenToUser, transferSolToUser } = require('../utils/transfer');
+const { getSolPriceUsd } = require('../utils/price');
+const { Connection, PublicKey, Keypair, SystemProgram, Transaction, sendAndConfirmTransaction } = require('@solana/web3.js');
+// bs58 v6 ships CJS with the codec on `.default`
+const bs58Module = require('bs58');
+const bs58 = bs58Module.default || bs58Module;
 
-// Import SDK package directly from the root
-const LazorkitWallet = require('@lazorkit/wallet');
+/**
+ * Wallet model (LazorKit SDK 3.x / protocol v2):
+ * The frontend SDK creates and owns the smart wallet during `connect()`.
+ * The address users receive funds on is the wallet's *vault* PDA
+ * (`WalletInfo.vaultPda`), which the frontend sends as `smartWalletAddress`.
+ * The backend no longer builds wallet-creation transactions itself.
+ */
 
-const fiveMinutesMs = 5 * 60 * 1000;
-
-// Helper: Convert any format to Uint8Array
-function toUint8Array(input) {
-  if (!input) return input;
-  
-  // Already Uint8Array
-  if (input instanceof Uint8Array) return input;
-  
-  // Buffer
-  if (Buffer.isBuffer(input)) return new Uint8Array(input);
-  
-  // Array or array-like object {0: 1, 1: 2, ...}
-  if (typeof input === 'object') {
-    // Check if it's array-like
-    if (Array.isArray(input)) {
-      return new Uint8Array(input);
-    }
-    // Check if it's object with numeric keys
-    const keys = Object.keys(input);
-    if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
-      const arr = [];
-      for (let i = 0; i < keys.length; i++) {
-        arr.push(input[i]);
-      }
-      return new Uint8Array(arr);
-    }
-  }
-  
-  // Base64url string
-  if (typeof input === 'string') {
-    try {
-      let s = input.replace(/-/g, '+').replace(/_/g, '/');
-      const pad = s.length % 4;
-      if (pad) s += '='.repeat(4 - pad);
-      const buf = Buffer.from(s, 'base64');
-      return new Uint8Array(buf);
-    } catch (err) {
-      console.error('Failed to decode base64url:', err);
-    }
-  }
-  
-  return input;
+function getRpcUrl() {
+  return process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
 }
 
-// Minimal BN-like shim when bn.js is unavailable
-function makeBnLike(bytes) {
-  const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes || []);
-  return {
-    toArrayLike(Type, endian, length) {
-      const b = Buffer.from(buf);
-      // Default big-endian behavior similar to BN
-      let out = b;
-      if (length) {
-        if (b.length > length) out = b.slice(b.length - length);
-        else if (b.length < length) out = Buffer.concat([Buffer.alloc(length - b.length, 0), b]);
-      }
-      if (Type === Buffer) return out;
-      if (Type === Uint8Array) return new Uint8Array(out);
-      return Array.from(out);
-    }
-  };
-}
-
-// Helper: encode Uint8Array/Buffer to base64url string
-function toBase64Url(input) {
+function isValidPublicKey(value) {
+  if (!value || typeof value !== 'string') return false;
   try {
-    if (!input) return input;
-    let buf;
-    if (input instanceof Uint8Array) buf = Buffer.from(input);
-    else if (Buffer.isBuffer(input)) buf = input;
-    else return input;
-    return buf.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  } catch (_) {
-    return input;
+    new PublicKey(value);
+    return true;
+  } catch {
+    return false;
   }
 }
 
-// Helper: convert base64url -> standard base64
-function fromBase64Url(b64url) {
-  try {
-    if (!b64url || typeof b64url !== 'string') return b64url;
-    let s = b64url.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = s.length % 4;
-    if (pad) s += '='.repeat(4 - pad);
-    return s;
-  } catch (_) {
-    return b64url;
-  }
+/** Resolve the fund-holding wallet address from frontend passkey/wallet data. */
+function resolveWalletAddress(passkeyData) {
+  if (!passkeyData || typeof passkeyData !== 'object') return null;
+  const candidates = [passkeyData.smartWalletAddress, passkeyData.vaultPda, passkeyData.smartWallet];
+  return candidates.find(isValidPublicKey) || null;
 }
 
-// Helper: compress P-256 point (x,y) to 33-byte compressed key, return base64 string
-function compressP256ToBase64(xBn, yBn) {
-  if (!xBn || !yBn) return null;
+/**
+ * Optionally seed a brand-new wallet vault with a little SOL so it can pay rent
+ * (e.g. for creating recipient token accounts). Only on devnet/localnet, only
+ * when the vault is empty, and never fatal for the caller.
+ */
+async function fundNewWalletIfEmpty(connection, walletAddress) {
+  const lamports = Number(process.env.SMART_WALLET_INIT_LAMPORTS);
+  const adminSecret = process.env.PRIVATE_KEY;
+  const isDev = /devnet|localhost|127\.0\.0\.1/i.test(getRpcUrl());
+  if (!isDev || !adminSecret || !Number.isFinite(lamports) || lamports <= 0) {
+    return { funded: false, reason: 'funding disabled' };
+  }
   try {
-    const xBuf = Buffer.isBuffer(xBn) ? xBn : Buffer.from(xBn.toArrayLike(Buffer, 'be', 32));
-    const yBuf = Buffer.isBuffer(yBn) ? yBn : Buffer.from(yBn.toArrayLike(Buffer, 'be', 32));
-    const yIsEven = (yBuf[yBuf.length - 1] % 2) === 0;
-    const prefix = Buffer.from([yIsEven ? 0x02 : 0x03]);
-    const comp = Buffer.concat([prefix, xBuf]);
-    return comp.toString('base64');
+    const vault = new PublicKey(walletAddress);
+    const balance = await connection.getBalance(vault, 'confirmed');
+    if (balance > 0) return { funded: false, reason: 'already funded' };
+
+    const admin = Keypair.fromSecretKey(bs58.decode(adminSecret));
+    const tx = new Transaction().add(
+      SystemProgram.transfer({ fromPubkey: admin.publicKey, toPubkey: vault, lamports })
+    );
+    const signature = await sendAndConfirmTransaction(connection, tx, [admin], { commitment: 'confirmed' });
+    console.log('[wallet-funding] Seeded new wallet', walletAddress, 'with', lamports, 'lamports:', signature);
+    return { funded: true, signature, lamports };
   } catch (e) {
-    console.error('Failed to compress P-256 pubkey:', e);
-    return null;
+    console.warn('[wallet-funding] Skipped:', e?.message || e);
+    return { funded: false, reason: e?.message || 'funding failed' };
   }
-}
-
-// Helper: standard-compress any public key format to correct 33-byte compressed SECP256R1 key
-function normalizePublicKey(key) {
-  if (!key) return key;
-  let buf;
-  if (typeof key === 'string') {
-    if (/^[A-Za-z0-9+/]*={0,2}$/.test(key)) {
-      buf = Buffer.from(key, 'base64');
-    } else {
-      buf = Buffer.from(key, 'hex');
-    }
-  } else if (Array.isArray(key) || key instanceof Uint8Array) {
-    buf = Buffer.from(key);
-  } else {
-    return key;
-  }
-
-  // standard compressed: 33 bytes, starts with 0x02 or 0x03
-  if (buf.length === 33 && (buf[0] === 2 || buf[0] === 3)) {
-    return buf;
-  }
-
-  // naive compressed: X || Y[0]
-  if (buf.length === 33) {
-    const x = buf.subarray(0, 32);
-    const y0 = buf[32];
-    const prefix = (y0 % 2 === 0) ? 2 : 3;
-    return Buffer.concat([Buffer.from([prefix]), x]);
-  }
-
-  // raw uncompressed: 64 bytes (X || Y)
-  if (buf.length === 64) {
-    const x = buf.subarray(0, 32);
-    const y = buf.subarray(32, 64);
-    const yIsEven = (y[31] % 2 === 0);
-    const prefix = yIsEven ? 2 : 3;
-    return Buffer.concat([Buffer.from([prefix]), x]);
-  }
-
-  // SPKI uncompressed: 65 bytes (0x04 || X || Y)
-  if (buf.length === 65 && buf[0] === 4) {
-    const x = buf.subarray(1, 33);
-    const y = buf.subarray(33, 65);
-    const yIsEven = (y[31] % 2 === 0);
-    const prefix = yIsEven ? 2 : 3;
-    return Buffer.concat([Buffer.from([prefix]), x]);
-  }
-
-  return buf;
-}
-
-// Normalize passkey data for SDK backend
-// CRITICAL: Backend SDK expects publicKey.x/y as Uint8Array
-function normalizePasskeyData(raw) {
-  if (!raw || typeof raw !== 'object') return raw;
-  
-  console.log('🔍 Normalizing passkey data, input types:', {
-    credentialId: typeof raw.credentialId,
-    userId: typeof raw.userId,
-    hasPublicKey: !!raw.publicKey,
-    hasPasskeyPubkey: !!raw.passkeyPubkey,
-    publicKeyX: raw.publicKey?.x ? (raw.publicKey.x.constructor?.name || typeof raw.publicKey.x) : 'missing',
-    publicKeyY: raw.publicKey?.y ? (raw.publicKey.y.constructor?.name || typeof raw.publicKey.y) : 'missing'
-  });
-  
-  const out = { ...raw };
-  
-  // Convert and normalize passkeyPubkey
-  const targetKey = raw.passkeyPubkey || raw.passkeyPublicKey || raw.publicKeyBase64;
-  if (targetKey && (typeof targetKey === 'string' || Array.isArray(targetKey) || targetKey instanceof Uint8Array)) {
-    const normBuf = normalizePublicKey(targetKey);
-    out.passkeyPublicKey = normBuf.toString('base64');
-  }
-  
-  // credentialId and userId can be base64url strings
-  if (out.credentialId && typeof out.credentialId !== 'string') {
-    out.credentialId = toBase64Url(out.credentialId);
-  }
-  if (out.userId && typeof out.userId !== 'string') {
-    out.userId = toBase64Url(out.userId);
-  }
-
-
-  // CRITICAL: publicKey.x and publicKey.y MUST be Uint8Array
-  if (out.publicKey && typeof out.publicKey === 'object') {
-    const pk = { ...out.publicKey };
-    
-    // Convert to Uint8Array regardless of input format
-    if (pk.x) {
-      const xBytes = toUint8Array(pk.x);
-      // Prefer BN if available because some SDK paths expect .toArrayLike()
-      pk.x = BN ? new BN(Buffer.from(xBytes)) : makeBnLike(xBytes);
-      console.log('✅ Converted publicKey.x to:', BN ? 'BN' : (xBytes?.constructor?.name), 'length:', BN ? 32 : xBytes?.length);
-    }
-    if (pk.y) {
-      const yBytes = toUint8Array(pk.y);
-      pk.y = BN ? new BN(Buffer.from(yBytes)) : makeBnLike(yBytes);
-      console.log('✅ Converted publicKey.y to:', BN ? 'BN' : (yBytes?.constructor?.name), 'length:', BN ? 32 : yBytes?.length);
-    }
-    
-    out.publicKey = pk;
-
-    // Overwrite/guarantee passkeyPublicKey using coordinates if both are present
-    if (pk.x && pk.y) {
-      try {
-        const xBytes = toUint8Array(pk.x);
-        const yBytes = toUint8Array(pk.y);
-        const compressedB64 = compressP256ToBase64(xBytes, yBytes);
-        if (compressedB64) {
-          out.passkeyPublicKey = compressedB64;
-          console.log('✅ Override passkeyPublicKey with compressed x/y:', compressedB64);
-        }
-      } catch (err) {
-        console.warn('Failed to compress from x/y coordinates:', err);
-      }
-    }
-  }
-
-  
-  console.log('✅ Normalized passkey data:', {
-    credentialId: out.credentialId?.slice(0, 10) + '...',
-    hasPasskeyPublicKey: !!out.passkeyPublicKey,
-    publicKeyXType: out.publicKey?.x?.constructor?.name,
-    publicKeyYType: out.publicKey?.y?.constructor?.name,
-  });
-  
-  return out;
 }
 
 router.post('/', async (req, res, next) => {
@@ -291,17 +114,80 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-router.post('/callback/success', async (req, res, next) => {
+/**
+ * Payment-provider webhook authentication. With ONRAMP_WEBHOOK_SECRET set, callbacks
+ * must carry `x-rampfi-timestamp` (unix seconds, ±5 min) and
+ * `x-rampfi-signature: sha256=<hex HMAC-SHA256(secret, "<timestamp>.<raw body>")>`.
+ * Without a secret (local dev) unsigned callbacks are accepted.
+ */
+function verifyProviderSignature(req, res, next) {
+  const secret = process.env.ONRAMP_WEBHOOK_SECRET;
+  if (!secret) return next();
+  const ts = req.get('x-rampfi-timestamp');
+  const sig = String(req.get('x-rampfi-signature') || '').replace(/^sha256=/, '');
+  if (!ts || !sig || !/^\d+$/.test(ts) || Math.abs(Date.now() / 1000 - Number(ts)) > 300) {
+    return res.status(401).json({ error: 'Missing or stale webhook signature' });
+  }
+  const raw = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body || {});
+  const expected = crypto.createHmac('sha256', secret).update(`${ts}.${raw}`).digest('hex');
+  const a = Buffer.from(sig, 'hex');
+  const b = Buffer.from(expected, 'hex');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'Invalid webhook signature' });
+  }
+  return next();
+}
+
+/** The sandbox checkout (browser) acts as the payment provider: dev only unless enabled. */
+function requireMockProvider(req, res, next) {
+  const flag = process.env.ONRAMP_MOCK_PROVIDER;
+  const enabled = flag ? flag === 'true' : process.env.NODE_ENV !== 'production';
+  if (!enabled) return res.status(404).json({ error: 'Mock payment provider is disabled' });
+  return next();
+}
+
+async function handlePaymentSuccess(req, res, next) {
   try {
     const { reference, orderId } = req.body || {};
     const ref = reference || orderId;
     if (!ref) return res.status(400).json({ error: 'Missing reference' });
-    
+
     console.log('[callback/success] Processing payment for reference:', ref);
-    
-    // Step 1: Get order from DB
-    const order = await Order.findOne({ reference: ref });
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+
+    // Step 1: Atomically claim the order so concurrent/repeated callbacks can't pay out twice.
+    const order = await Order.findOneAndUpdate(
+      { reference: ref, status: 'pending' },
+      { $set: { status: 'processing' } },
+      { new: true }
+    );
+    if (!order) {
+      const existing = await Order.findOne({ reference: ref });
+      if (!existing) return res.status(404).json({ error: 'Order not found' });
+      if (existing.status === 'success') {
+        // Idempotent: return the original payout instead of transferring again
+        return res.json({
+          ok: true,
+          alreadyProcessed: true,
+          walletAddress: existing.walletAddress,
+          reference: existing.reference,
+          status: existing.status,
+          txSignature: existing.txSignature,
+          creditedAmount: existing.creditedAmount,
+          token: existing.token,
+        });
+      }
+      return res.status(409).json({ error: `Order is ${existing.status}`, status: existing.status });
+    }
+
+    const releaseOrder = async (status = 'pending') => {
+      order.status = status;
+      await order.save();
+    };
+
+    if (order.expiresAt && order.expiresAt.getTime() < Date.now()) {
+      await releaseOrder('failed');
+      return res.status(410).json({ error: 'Order expired', status: 'failed' });
+    }
 
     console.log('[callback/success] Order found:', {
       reference: order.reference,
@@ -309,275 +195,67 @@ router.post('/callback/success', async (req, res, next) => {
       smartWalletAddress: order.passkeyData?.smartWalletAddress
     });
 
-    // Step 2: Prepare wallet data from order
-    let finalWallet = order.passkeyData?.smartWalletAddress || order.walletAddress || null;
-    const existingWalletId = order.passkeyData?.smartWalletId || order.passkeyData?.walletId || order.passkeyData?.smartWalletID || null;
-    console.log('[callback/success] Target wallet (from order if any):', finalWallet, 'walletId:', existingWalletId);
-
-    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
-    const connection = new Connection(rpcUrl, 'confirmed');
-    
-    // Step 3: Check if wallet exists onchain (only if we have an address)
-    let accountInfo = null;
-    if (finalWallet) {
-      try { accountInfo = await connection.getAccountInfo(new PublicKey(finalWallet)); } catch {}
+    // Step 2: Resolve the wallet that receives the tokens.
+    // The smart wallet is created client-side by the LazorKit SDK during connect().
+    const finalWallet = order.walletAddress || resolveWalletAddress(order.passkeyData);
+    if (!finalWallet) {
+      await releaseOrder('pending');
+      return res.status(400).json({
+        error: 'Missing wallet address',
+        reason: 'Order has no valid smartWalletAddress. Reconnect your passkey wallet and retry.',
+      });
     }
+    console.log('[callback/success] Target wallet:', finalWallet);
 
-    // Create when not onchain OR when we don't have a walletId to reliably derive PDA
-    if (!accountInfo || !existingWalletId) {
-      console.log('[callback/success] Wallet missing info/onchain. Creating smart wallet...');
-
-      try {
-        // Get admin keypair
-        const adminSecret = process.env.PRIVATE_KEY;
-        if (!adminSecret) {
-          throw new Error('Missing PRIVATE_KEY for admin signer');
-        }
-        const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminSecret));
-        console.log('[callback/success] Admin keypair:', adminKeypair.publicKey.toString());
-
-        // Normalize passkey data from DB
-        const passkeyDataToUse = normalizePasskeyData(order.passkeyData);
-        if (!passkeyDataToUse) {
-          throw new Error('Missing passkey data for smart wallet creation');
-        }
-
-        // Build parameters required by LazorKit backend SDK
-        // Expecting these fields persisted from FE passkey registration
-        // Use existing walletId if present, else generate a new one (as decimal string)
-        let smartWalletIdRaw = passkeyDataToUse?.smartWalletId || passkeyDataToUse?.walletId || passkeyDataToUse?.smartWalletID;
-        // credentialId may be base64url; normalize to standard base64
-        const credentialIdBase64 = fromBase64Url(passkeyDataToUse?.credentialId || passkeyDataToUse?.credentialID);
-        // passkeyPublicKey may be provided directly or derivable from x/y
-        let passkeyPublicKeyBase64 = passkeyDataToUse?.passkeyPublicKey || passkeyDataToUse?.publicKeyBase64 || passkeyDataToUse?.publicKey;
-        if (!passkeyPublicKeyBase64 && passkeyDataToUse?.publicKey?.x && passkeyDataToUse?.publicKey?.y) {
-          // Use normalized BN values from earlier normalizePasskeyData
-          const xBn = passkeyDataToUse.publicKey.x;
-          const yBn = passkeyDataToUse.publicKey.y;
-          passkeyPublicKeyBase64 = compressP256ToBase64(xBn, yBn);
-        }
-
-        // Instantiate LazorkitClient directly from the root package
-        const client = new LazorkitWallet.LazorkitClient(connection);
-
-        // If no walletId yet, generate via client internals (8 bytes random) BEFORE checking
-        if (!smartWalletIdRaw && typeof client?.generateWalletId === 'function') {
-          try {
-            const bn = client.generateWalletId();
-            smartWalletIdRaw = bn.toString();
-          } catch (err) {
-            console.error('[callback/success] Failed to generate smart wallet ID:', err);
-          }
-        }
-
-        console.log('[callback/success] Passkey fields prepared:', {
-          hasSmartWalletId: !!smartWalletIdRaw,
-          credentialIdLen: credentialIdBase64 ? credentialIdBase64.length : 0,
-          hasPkB64: !!passkeyPublicKeyBase64,
-        });
-
-        if (!smartWalletIdRaw || !credentialIdBase64 || !passkeyPublicKeyBase64) {
-          throw new Error('Missing required passkey fields (smartWalletId, credentialId, passkeyPublicKey)');
-        }
-
-        // If walletId is a hex-like string starting with 0x, convert to BN base16
-        let walletIdParam = smartWalletIdRaw;
-        if (typeof smartWalletIdRaw === 'string' && smartWalletIdRaw.startsWith('0x')) {
-          try {
-            const hex = smartWalletIdRaw.slice(2);
-            walletIdParam = BN ? new BN(hex, 16) : hex; // BN preferred if available
-          } catch {}
-        }
-
-        let initLamportsNum = Number(process.env.SMART_WALLET_INIT_LAMPORTS);
-        if (!Number.isFinite(initLamportsNum) || initLamportsNum <= 0) {
-          initLamportsNum = 5_000_000; // fallback ~0.005 SOL to cover InitPolicy rent
-        }
-        if (initLamportsNum < 3_500_000) {
-          initLamportsNum = 3_500_000;
-        }
-        console.log('[callback/success] Funding smart wallet with lamports:', initLamportsNum);
-        const initLamports = BN ? new BN(initLamportsNum) : initLamportsNum;
-        const pkBytes = Array.from(Buffer.from(passkeyPublicKeyBase64, 'base64'));
-        const walletIdBn = BN && walletIdParam && typeof walletIdParam !== 'string' ? walletIdParam : (BN ? new BN(String(walletIdParam), 10) : walletIdParam);
-
-        // Derive expected PDA for smart wallet (will be owned by LazorKit program)
-        let expectedPda = null;
-        try {
-          expectedPda = client.getSmartWalletPubkey(walletIdBn);
-          console.log('[callback/success] Expected smart wallet PDA:', expectedPda?.toBase58?.() || String(expectedPda));
-        } catch (_) {}
-
-        let result;
-        const txnOut = await client.createSmartWalletTxn({
-          payer: adminKeypair.publicKey,
-          passkeyPublicKey: pkBytes,
-          credentialIdBase64,
-          smartWalletId: walletIdBn,
-          amount: initLamports,
-        });
-
-        result = { transaction: txnOut.transaction, smartWallet: (expectedPda?.toBase58?.() || txnOut.smartWallet?.toBase58?.() || txnOut.smartWallet), smartWalletId: walletIdBn };
-
-        console.log('[callback/success] Smart wallet creation result:', {
-          smartWalletAddress: result?.smartWalletAddress || finalWallet,
-          hasSignature: !!result?.signature,
-          hasTx: !!(result?.transaction || result?.tx)
-        });
-
-        // Sign and send transaction (admin signer, no relayer)
-        if (result?.signature) {
-          console.log('[callback/success] Transaction already signed:', result.signature);
-        } else if (result?.transaction || result?.tx) {
-          const transaction = result.transaction || result.tx;
-          
-          if (!transaction.recentBlockhash) {
-            const { blockhash } = await connection.getLatestBlockhash('confirmed');
-            transaction.recentBlockhash = blockhash;
-          }
-
-          if (!transaction.feePayer) {
-            transaction.feePayer = adminKeypair.publicKey;
-          }
-
-          // Ensure admin has enough SOL to cover rent/fees when running on devnet/testnet/localnet
-          try {
-            const url = String(rpcUrl).toLowerCase();
-            const isDev = /devnet|localhost|127\.0\.0\.1/.test(url);
-            const minLamports = Number(process.env.MIN_FEE_LAMPORTS || 5_000_000); // ~0.005 SOL
-            let bal = await connection.getBalance(adminKeypair.publicKey, 'confirmed');
-            if (isDev && bal < minLamports) {
-              const airdropLamports = Number(process.env.AIRDROP_LAMPORTS || 1_000_000_000); // 1 SOL
-              console.log('[callback/success] Low admin balance. Requesting airdrop:', airdropLamports, 'lamports');
-              const sig = await connection.requestAirdrop(adminKeypair.publicKey, airdropLamports);
-              await connection.confirmTransaction(sig, 'confirmed');
-              bal = await connection.getBalance(adminKeypair.publicKey, 'confirmed');
-              console.log('[callback/success] New admin balance:', bal);
-            }
-          } catch (e) {
-            console.warn('[callback/success] Airdrop/top-up skipped or failed:', e?.message || e);
-          }
-
-          transaction.sign(adminKeypair);
-          
-          const rawTransaction = transaction.serialize();
-          const signature = await connection.sendRawTransaction(rawTransaction, {
-            skipPreflight: false,
-            preflightCommitment: 'confirmed'
-          });
-
-          console.log('[callback/success] Transaction sent:', signature);
-          
-          const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-          
-          if (confirmation.value.err) {
-            throw new Error('Transaction failed: ' + JSON.stringify(confirmation.value.err));
-          }
-          
-          console.log('[callback/success] Transaction confirmed');
-        }
-
-        // Resolve the ACTUAL PDA smart wallet from chain using multiple strategies
-        const lazorkitProgramId = (() => {
-          try {
-            const c = client;
-            return c?.programId?.toBase58?.() || c?.programId?.toString?.() || null;
-          } catch { return null; }
-        })();
-
-        const candidates = [];
-        if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
-        try {
-          const credentialHash = LazorkitWallet.credentialHashFromBase64(credentialIdBase64);
-          const byCred = await client.getSmartWalletByCredentialHash(credentialHash);
-          const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
-          if (p) candidates.push(p);
-        } catch (e) { console.warn('[callback/success] getSmartWalletByCredentialHash failed:', e?.message || e); }
-
-        let picked = null;
-        for (const addr of candidates) {
-          try {
-            const info = await connection.getAccountInfo(new PublicKey(addr));
-            const owner = info?.owner?.toBase58?.() || info?.owner?.toString?.();
-            console.log('[callback/success] Candidate PDA owner check:', { addr, owner });
-            if (info && lazorkitProgramId && owner === lazorkitProgramId) { picked = addr; break; }
-          } catch {}
-        }
-
-        if (!picked) {
-          console.warn('[callback/success] No Lazorkit-owned PDA confirmed. Proceeding with first candidate (may be System Program).');
-          picked = candidates[0] || finalWallet;
-        }
-
-        finalWallet = picked;
-        order.walletAddress = finalWallet;
-        order.passkeyData = { ...(order.passkeyData || {}), smartWalletAddress: finalWallet, smartWalletId: smartWalletIdRaw };
-        await order.save();
-
-        console.log('[callback/success] Wallet resolved and saved:', finalWallet);
-
-      } catch (e) {
-        const reason = e?.message || String(e);
-        console.error('[callback/success] Smart wallet creation failed:', reason);
-        console.error('[callback/success] Full error:', e);
-        return res.status(400).json({ 
-          error: 'Backend smart wallet creation failed', 
-          reason,
-          details: e?.stack 
-        });
-      }
-    } else {
-      console.log('[callback/success] Wallet already exists onchain');
-    }
-
-    // Step 4: Transfer tokens
+    // Step 3: Pay out on-chain (rUSDC by default, native SOL for SOL orders)
     order.walletAddress = finalWallet;
 
     let txSignature = null;
     let creditedAmount = null;
-    
+
     try {
       const shouldTransfer = Boolean(process.env.TOKEN_MINT) && Boolean(process.env.PRIVATE_KEY);
       if (shouldTransfer) {
-        // Use subtotal for token transfer (exclude fees)
-        const subtotal = order.metadata?.find(m => m.key === 'subtotal')?.value || order.amount;
-        const tokenAmount = Number(subtotal);
-        creditedAmount = tokenAmount;
-        
-        console.log('[callback/success] Transferring tokens:', {
-          to: finalWallet,
-          amount: tokenAmount,
-          mint: process.env.TOKEN_MINT,
-        });
-        
-        const transferResult = await transferSplTokenToUser(finalWallet, tokenAmount);
-        txSignature = transferResult.signature;
-        
-        console.log('[callback/success] Token transfer completed:', txSignature);
+        // order.amount is the USD subtotal (fees excluded)
+        const usdAmount = Number(order.amount);
+        if (!Number.isFinite(usdAmount) || usdAmount <= 0) throw new Error('Invalid order amount');
+
+        if (String(order.token || 'USDC').toUpperCase() === 'SOL') {
+          const solPrice = await getSolPriceUsd();
+          const maxSol = Number(process.env.ONRAMP_MAX_SOL || 2);
+          const solAmount = Math.min(Number((usdAmount / solPrice).toFixed(6)), maxSol);
+          console.log('[callback/success] Paying SOL:', { to: finalWallet, usdAmount, solPrice, solAmount });
+          const result = await transferSolToUser(finalWallet, solAmount);
+          txSignature = result.signature;
+          creditedAmount = result.amount;
+        } else {
+          console.log('[callback/success] Paying rUSDC:', { to: finalWallet, amount: usdAmount, mint: process.env.TOKEN_MINT });
+          const result = await transferSplTokenToUser(finalWallet, usdAmount);
+          txSignature = result.signature;
+          creditedAmount = usdAmount;
+        }
+        console.log('[callback/success] Payout completed:', txSignature);
       }
     } catch (e) {
       const reason = e?.message || 'Transfer failed';
-      console.error('[callback/success] Token transfer failed:', reason);
-      
-      order.status = 'pending';
-      await order.save();
-      
-      return res.status(202).json({ 
-        ok: false, 
-        pending: true, 
-        reason, 
-        reference: order.reference 
+      console.error('[callback/success] Payout failed:', reason);
+      await releaseOrder('pending');
+      return res.status(202).json({
+        ok: false,
+        pending: true,
+        reason,
+        reference: order.reference
       });
     }
 
-    // Step 5: Update order status
+    // Step 4: Update order status
     order.status = 'success';
     if (txSignature) order.txSignature = txSignature;
     if (creditedAmount != null) order.creditedAmount = creditedAmount;
     if (order.expiresAt) order.expiresAt = undefined;
-    
+
     await order.save();
-    
+
     console.log('[callback/success] Order completed:', {
       reference: order.reference,
       walletAddress: order.walletAddress,
@@ -585,32 +263,47 @@ router.post('/callback/success', async (req, res, next) => {
       creditedAmount
     });
 
-    return res.json({ 
-      ok: true, 
-      walletAddress: finalWallet, 
-      reference: order.reference, 
-      status: order.status, 
-      txSignature, 
-      creditedAmount 
+    return res.json({
+      ok: true,
+      walletAddress: finalWallet,
+      reference: order.reference,
+      status: order.status,
+      txSignature,
+      creditedAmount,
+      token: order.token,
     });
-    
-  } catch (err) { 
-    console.error('[callback/success] Error:', err);
-    return next(err); 
-  }
-});
 
-router.post('/callback/failed', async (req, res, next) => {
+  } catch (err) {
+    console.error('[callback/success] Error:', err);
+    return next(err);
+  }
+}
+
+async function handlePaymentFailed(req, res, next) {
   try {
     const { reference } = req.body || {};
     if (!reference) return res.status(400).json({ error: 'Missing reference' });
-    const order = await Order.findOne({ reference });
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    order.status = 'failed';
-    await order.save();
+    // Only a pending order can be failed (never a paid one)
+    const order = await Order.findOneAndUpdate(
+      { reference, status: 'pending' },
+      { $set: { status: 'failed' } },
+      { new: true }
+    );
+    if (!order) {
+      const existing = await Order.findOne({ reference });
+      if (!existing) return res.status(404).json({ error: 'Order not found' });
+      return res.status(409).json({ error: `Order is ${existing.status}`, status: existing.status });
+    }
     return res.json({ ok: true });
   } catch (err) { return next(err); }
-});
+}
+
+// Real provider webhooks (HMAC-signed when ONRAMP_WEBHOOK_SECRET is set)
+router.post('/callback/success', verifyProviderSignature, handlePaymentSuccess);
+router.post('/callback/failed', verifyProviderSignature, handlePaymentFailed);
+// Sandbox checkout page (stands in for the provider on devnet)
+router.post('/mock-provider/pay', requireMockProvider, handlePaymentSuccess);
+router.post('/mock-provider/cancel', requireMockProvider, handlePaymentFailed);
 
 const fs = require('fs');
 const path = require('path');
@@ -704,6 +397,8 @@ router.get('/:reference', async (req, res, next) => {
       amount: order.amount,
       currency: order.currency,
       token: order.token,
+      txSignature: order.txSignature || null,
+      creditedAmount: order.creditedAmount ?? null,
     });
   } catch (err) { return next(err); }
 });
@@ -739,46 +434,39 @@ router.get('/balance/:walletAddress', async (req, res, next) => {
 router.post('/check-wallet', async (req, res, next) => {
   try {
     const { passkeyData } = req.body || {};
-    
+
     if (!passkeyData) {
       return res.status(400).json({ error: 'Missing passkeyData' });
     }
-    
-    const smartWalletAddress = passkeyData.smartWalletAddress;
-    
-    if (!smartWalletAddress) {
-      return res.json({
-        exists: false,
-        walletAddress: null,
-        orderReference: null,
-        passkeyData: null
-      });
+
+    const smartWalletAddress = resolveWalletAddress(passkeyData);
+    const empty = { exists: false, walletAddress: null, orderReference: null, passkeyData: null };
+    if (!smartWalletAddress) return res.json(empty);
+
+    // A v2 vault is a System-owned PDA that only shows up on chain once it holds
+    // lamports, so also accept the wallet PDA or an earlier successful order.
+    const connection = new Connection(getRpcUrl(), 'confirmed');
+    const toCheck = [smartWalletAddress, passkeyData.walletPda].filter(isValidPublicKey);
+    let onChain = false;
+    for (const addr of toCheck) {
+      try {
+        if (await connection.getAccountInfo(new PublicKey(addr))) { onChain = true; break; }
+      } catch {}
     }
-    
-    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
-    const connection = new Connection(rpcUrl, 'confirmed');
-    const accountInfo = await connection.getAccountInfo(new PublicKey(smartWalletAddress));
-    
-    if (accountInfo) {
-      const existingOrder = await Order.findOne({
-        walletAddress: smartWalletAddress,
-        status: 'success'
-      }).sort({ createdAt: -1 });
-      
-      return res.json({
-        exists: true,
-        walletAddress: smartWalletAddress,
-        orderReference: existingOrder?.reference || null,
-        passkeyData: existingOrder?.passkeyData || passkeyData
-      });
-    } else {
-      return res.json({
-        exists: false,
-        walletAddress: null,
-        orderReference: null,
-        passkeyData: null
-      });
-    }
+
+    const existingOrder = await Order.findOne({
+      walletAddress: smartWalletAddress,
+      status: 'success'
+    }).sort({ createdAt: -1 });
+
+    if (!onChain && !existingOrder) return res.json(empty);
+
+    return res.json({
+      exists: true,
+      walletAddress: smartWalletAddress,
+      orderReference: existingOrder?.reference || null,
+      passkeyData: existingOrder?.passkeyData || passkeyData
+    });
   } catch (err) {
     console.error('Check wallet failed:', err);
     return next(err);
@@ -786,136 +474,23 @@ router.post('/check-wallet', async (req, res, next) => {
 });
 
 // POST /api/orders/create-smart-wallet
-// Create a smart wallet immediately after a successful passkey login.
-// Reuses the exact backend creation logic from /callback/success but without orders and without token transfers.
+// Kept for API compatibility. With LazorKit SDK 3.x the wallet is created by the
+// SDK during connect(); this endpoint registers/validates the resulting address
+// and optionally seeds an empty devnet vault with SMART_WALLET_INIT_LAMPORTS.
 router.post('/create-smart-wallet', async (req, res, next) => {
   try {
-    const { passkeyData } = req.body || {};
-    if (!passkeyData) {
-      return res.status(400).json({ error: 'Missing passkeyData' });
+    const { passkeyData, walletAddress: bodyAddress } = req.body || {};
+    const walletAddress = isValidPublicKey(bodyAddress) ? bodyAddress : resolveWalletAddress(passkeyData);
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'Missing or invalid smartWalletAddress' });
     }
 
-    const rpcUrl = process.env.RPC_URL || process.env.LAZORKIT_RPC_URL || 'https://api.devnet.solana.com';
-    const connection = new Connection(rpcUrl, 'confirmed');
+    const connection = new Connection(getRpcUrl(), 'confirmed');
+    const funding = await fundNewWalletIfEmpty(connection, walletAddress);
 
-    // Admin signer
-    const adminSecret = process.env.PRIVATE_KEY;
-    if (!adminSecret) {
-      return res.status(500).json({ error: 'Missing PRIVATE_KEY for admin signer' });
-    }
-    const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminSecret));
-
-    // Normalize and extract required fields
-    const normalized = normalizePasskeyData(passkeyData);
-    const credentialIdBase64 = fromBase64Url(normalized?.credentialId || normalized?.credentialID);
-    let passkeyPublicKeyBase64 = normalized?.passkeyPublicKey || normalized?.publicKeyBase64 || normalized?.publicKey;
-    if (!passkeyPublicKeyBase64 && normalized?.publicKey?.x && normalized?.publicKey?.y) {
-      const xBn = normalized.publicKey.x;
-      const yBn = normalized.publicKey.y;
-      passkeyPublicKeyBase64 = compressP256ToBase64(xBn, yBn);
-    }
-
-    let smartWalletIdRaw = normalized?.smartWalletId || normalized?.walletId || normalized?.smartWalletID;
-
-    const client = new LazorkitWallet.LazorkitClient(connection);
-
-    // Generate walletId if missing
-    if (!smartWalletIdRaw && typeof client.generateWalletId === 'function') {
-      try {
-        const bn = client.generateWalletId();
-        smartWalletIdRaw = bn.toString();
-      } catch {}
-    }
-
-    if (!smartWalletIdRaw || !credentialIdBase64 || !passkeyPublicKeyBase64) {
-      return res.status(400).json({ error: 'Missing required passkey fields (smartWalletId, credentialId, passkeyPublicKey)' });
-    }
-
-    // Prepare params: convert hex string starting with 0x to base16 BN
-    let walletIdParam = smartWalletIdRaw;
-    if (typeof smartWalletIdRaw === 'string' && smartWalletIdRaw.startsWith('0x')) {
-      try {
-        const hex = smartWalletIdRaw.slice(2);
-        walletIdParam = BN ? new BN(hex, 16) : hex;
-      } catch {}
-    }
-
-    let initLamportsNum = Number(process.env.SMART_WALLET_INIT_LAMPORTS);
-    if (!Number.isFinite(initLamportsNum) || initLamportsNum <= 0) initLamportsNum = 5_000_000;
-    if (initLamportsNum < 3_500_000) initLamportsNum = 3_500_000;
-    const initLamports = BN ? new BN(initLamportsNum) : initLamportsNum;
-
-    const pkBytes = Array.from(Buffer.from(passkeyPublicKeyBase64, 'base64'));
-    const walletIdBn = BN && walletIdParam && typeof walletIdParam !== 'string' ? walletIdParam : (BN ? new BN(String(walletIdParam), 10) : walletIdParam);
-
-    // Build creation transaction
-    const txnOut = await client.createSmartWalletTxn({
-      payer: adminKeypair.publicKey,
-      passkeyPublicKey: pkBytes,
-      credentialIdBase64,
-      smartWalletId: walletIdBn,
-      amount: initLamports,
-    });
-
-    // Sign and send
-    const transaction = txnOut.transaction || txnOut.tx;
-    if (transaction) {
-      if (!transaction.recentBlockhash) {
-        const { blockhash } = await connection.getLatestBlockhash('confirmed');
-        transaction.recentBlockhash = blockhash;
-      }
-      if (!transaction.feePayer) transaction.feePayer = adminKeypair.publicKey;
-
-      // Ensure admin has some SOL on devnet
-      try {
-        const url = String(rpcUrl).toLowerCase();
-        const isDev = /devnet|localhost|127\.0\.0\.1/.test(url);
-        const minLamports = Number(process.env.MIN_FEE_LAMPORTS || 5_000_000);
-        let bal = await connection.getBalance(adminKeypair.publicKey, 'confirmed');
-        if (isDev && bal < minLamports) {
-          const airdropLamports = Number(process.env.AIRDROP_LAMPORTS || 1_000_000_000);
-          const sig = await connection.requestAirdrop(adminKeypair.publicKey, airdropLamports);
-          await connection.confirmTransaction(sig, 'confirmed');
-        }
-      } catch {}
-
-      transaction.sign(adminKeypair);
-      const raw = transaction.serialize();
-      const sig = await connection.sendRawTransaction(raw, { skipPreflight: false, preflightCommitment: 'confirmed' });
-      await connection.confirmTransaction(sig, 'confirmed');
-    }
-
-    // Resolve PDA candidates
-    let expectedPda = null;
-    try { expectedPda = client.getSmartWalletPubkey(walletIdBn); } catch {}
-
-    const candidates = [];
-    if (expectedPda) candidates.push(expectedPda?.toBase58?.() || String(expectedPda));
-    try {
-      const credentialHash = LazorkitWallet.credentialHashFromBase64(credentialIdBase64);
-      const byCred = await client.getSmartWalletByCredentialHash(credentialHash);
-      const p = byCred?.smartWallet?.toBase58?.() || byCred?.smartWallet || null;
-      if (p) candidates.push(p);
-    } catch {}
-
-    // Prefer LazorKit-owned account if resolvable
-    let walletAddress = candidates[0] || null;
-    try {
-      const programId = (() => { try { return client?.programId?.toBase58?.() || client?.programId?.toString?.(); } catch { return null; }})();
-      for (const addr of candidates) {
-        try {
-          const info = await connection.getAccountInfo(new PublicKey(addr));
-          const owner = info?.owner?.toBase58?.() || info?.owner?.toString?.();
-          if (info && programId && owner === programId) { walletAddress = addr; break; }
-        } catch {}
-      }
-    } catch {}
-
-    if (!walletAddress) return res.status(500).json({ error: 'Failed to resolve smart wallet address' });
-
-    return res.json({ ok: true, walletAddress, smartWalletId: smartWalletIdRaw });
+    return res.json({ ok: true, walletAddress, funded: funding.funded, fundingSignature: funding.signature || null });
   } catch (err) {
-    console.error('Create smart wallet failed:', err);
+    console.error('Register smart wallet failed:', err);
     return next(err);
   }
 });

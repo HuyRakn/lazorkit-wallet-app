@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Send, Clipboard, QrCode, ArrowRight, Wallet, ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
+import { Send, Clipboard, QrCode, ArrowRight, Wallet, ExternalLink, CheckCircle2, Loader2, Zap } from 'lucide-react';
 import { Button } from './ui/button';
 import { ViewportModal } from './ui/viewport-modal';
 import { Input } from './ui/input';
@@ -9,12 +9,26 @@ import { Label } from './ui/label';
 import { SimpleSelect } from './ui/simple-select';
 import { useWalletStore, TokenSym } from '@/lib/store/wallet';
 import { useWallet } from '@/hooks/use-lazorkit-wallet';
-import { TOKEN_ADDRESSES, TOKEN_DECIMALS, defaultConnection } from '@/lib/services/jupiter';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { TOKEN_ADDRESSES, TOKEN_DECIMALS, APP_USDC_MINT, defaultConnection } from '@/lib/services/jupiter';
+import { PublicKey, SystemProgram, TransactionInstruction } from '@solana/web3.js';
 import * as splToken from '@solana/spl-token';
 import { formatTokenAmount } from '@/lib/utils/format';
 import { isValidSolanaAddress } from '@/lib/utils/address';
 import { toast } from '@/hooks/use-toast';
+import { QRScannerModal } from './qr-scanner-modal';
+import { parsePaymentInput, withReferences } from '@/lib/solana-pay';
+import {
+  getAuthorityMarker,
+  getSessionMarker,
+  isLimitError,
+  isStaleKeyError,
+  pickQuickSigner,
+  sendWithQuickSigner,
+  type QuickSigner,
+} from '@/lib/lazorkit/quick-access';
+
+/** Rent for a new associated token account, paid by the sender's vault. */
+const ATA_RENT_SOL = 0.00204;
 
 interface SendModalViewportProps {
   open: boolean;
@@ -23,16 +37,27 @@ interface SendModalViewportProps {
 
 export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps) => {
   const { tokens, pubkey, addActivity, refreshBalances } = useWalletStore();
-  const lz = useWallet() as any;
+  const lz = useWallet();
   const [selectedToken, setSelectedToken] = useState<TokenSym>('SOL');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [quickPay, setQuickPay] = useState(true);
+  const [signedWith, setSignedWith] = useState<QuickSigner | 'passkey'>('passkey');
+  const [showScanner, setShowScanner] = useState(false);
+  const [references, setReferences] = useState<string[]>([]);
+  const [paymentNote, setPaymentNote] = useState<string>('');
+
+  const walletPda = lz.wallet?.smartWallet ?? null;
+  const hasQuickKey = open && !!(getSessionMarker(walletPda) || getAuthorityMarker(walletPda));
 
   const selectedTokenData = tokens.find((t) => t.symbol === selectedToken);
   const amountNum = parseFloat(amount) || 0;
+  const quickSignerPreview = hasQuickKey && amountNum > 0
+    ? pickQuickSigner(walletPda, { token: selectedToken, amount: amountNum })
+    : null;
 
   const validateForm = () => {
     if (!recipient.trim()) {
@@ -76,11 +101,13 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
 
       if (!lz?.signAndSendTransaction) throw new Error('Biometric signature provider not initialized.');
 
-      let sig: string;
+      const instructions: TransactionInstruction[] = [];
+      let rentSol = 0;
       if (selectedToken === 'SOL') {
         const lamports = Math.round(amountNum * 1e9);
-        const transferIx = SystemProgram.transfer({ fromPubkey: ownerPk, toPubkey: recipientPk, lamports });
-        sig = await lz.signAndSendTransaction([transferIx]);
+        let transferIx = SystemProgram.transfer({ fromPubkey: ownerPk, toPubkey: recipientPk, lamports });
+        if (references.length > 0) transferIx = withReferences(transferIx, references);
+        instructions.push(transferIx);
       } else {
         const mintStr = (TOKEN_ADDRESSES as Record<string, string>)[selectedToken];
         if (!mintStr) throw new Error('Unknown token mint');
@@ -100,9 +127,6 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
           }
         }
 
-        // Create instructions array
-        const instructions = [];
-
         // Check if recipient ATA exists, if not add create ATA instruction
         const toAtaInfo = await defaultConnection.getAccountInfo(toAta);
         if (!toAtaInfo) {
@@ -113,18 +137,43 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
             mintPk
           );
           instructions.push(createAtaIx);
+          rentSol = ATA_RENT_SOL;
         }
 
         // Add transfer instruction
-        const transferIx = typeof (splToken as any).createTransferInstruction === 'function'
+        let transferIx = typeof (splToken as any).createTransferInstruction === 'function'
           ? (splToken as any).createTransferInstruction(fromAta, toAta, ownerPk, rawAmount)
           : (splToken as any).createTransferCheckedInstruction(fromAta, mintPk, toAta, ownerPk, rawAmount, decimals);
+        if (references.length > 0) transferIx = withReferences(transferIx, references);
         instructions.push(transferIx);
-
-        // Send all instructions in one transaction
-        sig = await lz.signAndSendTransaction(instructions);
       }
 
+      // Quick Pay: a session / trusted-browser key signs without Face ID when the
+      // spend fits its on-chain limits. Anything else goes through the passkey.
+      const quickSigner = quickPay && walletPda
+        ? pickQuickSigner(walletPda, { token: selectedToken, amount: amountNum, rentSol })
+        : null;
+
+      let sig: string | null = null;
+      let usedSigner: QuickSigner | 'passkey' = 'passkey';
+      if (quickSigner && walletPda) {
+        try {
+          sig = await sendWithQuickSigner(lz, quickSigner, walletPda, instructions);
+          usedSigner = quickSigner;
+        } catch (err) {
+          if (!isStaleKeyError(err) && !isLimitError(err)) throw err;
+          console.warn('[quick-pay] falling back to passkey:', err);
+          toast({
+            title: 'Quick Pay unavailable',
+            description: isLimitError(err)
+              ? 'This payment is over the Quick Pay limit. Confirm with your passkey instead.'
+              : 'The Quick Pay key is no longer valid on this browser. Confirm with your passkey instead.',
+          });
+        }
+      }
+      if (!sig) sig = await lz.signAndSendTransaction(instructions);
+
+      setSignedWith(usedSigner);
       setTxSignature(sig);
 
       addActivity?.({
@@ -141,7 +190,7 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
 
       toast({
         title: '✅ Transfer Confirmed',
-        description: `${amountNum} ${selectedToken} sent successfully on Solana Devnet`,
+        description: `${amountNum} ${selectedToken} sent on Solana Devnet${usedSigner === 'passkey' ? '' : ' with Quick Pay (no Face ID)'}`,
       });
 
       // Refresh balances after transfer
@@ -160,7 +209,34 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
     setAmount('');
     setError('');
     setTxSignature(null);
+    setReferences([]);
+    setPaymentNote('');
+    setShowScanner(false);
     onOpenChange(false);
+  };
+
+  const applyPaymentInput = (raw: string) => {
+    const parsed = parsePaymentInput(raw);
+    if (parsed) {
+      setRecipient(parsed.recipient);
+      if (parsed.amount) setAmount(parsed.amount.toString());
+      if (parsed.splToken && parsed.splToken === APP_USDC_MINT) {
+        setSelectedToken('USDC');
+      } else if (!parsed.splToken) {
+        setSelectedToken('SOL');
+      }
+      if (parsed.reference) setReferences(parsed.reference);
+      if (parsed.label || parsed.message) {
+        setPaymentNote(parsed.label ? `${parsed.label}: ${parsed.message || ''}` : (parsed.message || ''));
+      }
+      setError('');
+      toast({
+        title: 'Solana Pay request loaded',
+        description: parsed.label || `To: ${parsed.recipient.slice(0, 4)}...${parsed.recipient.slice(-4)}`,
+      });
+      return true;
+    }
+    return false;
   };
 
   const handleMaxClick = () => {
@@ -182,7 +258,9 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         throw new Error('Invalid clipboard content');
       }
       
-      setRecipient(text);
+      if (!applyPaymentInput(text)) {
+        setRecipient(text.trim());
+      }
       setError('');
     } catch (error) {
       console.error('Error pasting from clipboard:', error);
@@ -191,6 +269,13 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         description: 'Failed to read from clipboard. Please paste manually.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleQRScanned = (data: string) => {
+    if (!applyPaymentInput(data)) {
+      setRecipient(data.trim());
+      toast({ title: 'Address scanned', description: data.slice(0, 8) + '...' });
     }
   };
 
@@ -230,6 +315,12 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
               <span className="text-muted-foreground/60">Gas Fee:</span>
               <span className="text-emerald-400 font-bold">$0.00 (Sponsored)</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground/60">Signed with:</span>
+              <span className={signedWith === 'passkey' ? '' : 'text-amber-400 font-bold'}>
+                {signedWith === 'passkey' ? 'Passkey' : signedWith === 'session' ? 'Quick Pay session' : 'Trusted browser key'}
+              </span>
+            </div>
           </div>
 
           <a
@@ -257,62 +348,84 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
       open={open}
       onOpenChange={handleClose}
       title="Send Tokens"
-      className="max-w-md"
+      className="max-w-[420px]"
     >
-      <div className="p-4 space-y-4">
+      <div className="p-5 space-y-4">
         {/* Token Selection */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium flex items-center gap-2">
-            <Wallet className="h-4 w-4" />
-            Select Token
-          </Label>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Wallet className="h-3.5 w-3.5 text-primary" />
+              Asset
+            </Label>
+            {selectedTokenData && (
+              <span className="text-[11px] font-mono text-muted-foreground">
+                Available:{' '}
+                <strong className="text-white">
+                  {formatTokenAmount(selectedTokenData.amount, selectedTokenData.symbol)}
+                </strong>
+              </span>
+            )}
+          </div>
           <SimpleSelect
             value={selectedToken}
             onValueChange={(value: string) => setSelectedToken(value as TokenSym)}
             options={tokenOptions}
             placeholder="Select Token"
-            className="h-10"
+            className="h-11 rounded-xl"
           />
-          {selectedTokenData && (
-            <div className="p-2 bg-muted/30 rounded-lg">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">
-                  Available Balance
-                </span>
-                <span className="font-medium">
-                  {formatTokenAmount(selectedTokenData.amount, selectedTokenData.symbol)}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Recipient Address */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Recipient Address
           </Label>
           <div className="space-y-2">
             <div className="flex gap-2">
               <Input
-                placeholder="Enter Solana address"
+                placeholder="Solana wallet or vault address..."
                 value={recipient}
                 onChange={(e) => {
                   setRecipient(e.target.value);
                   setError('');
                 }}
-                className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
+                className={`flex-1 h-11 rounded-xl premium-depth-inset border-white/10 font-mono text-xs ${
+                  error ? 'border-destructive' : ''
+                }`}
               />
-              <Button variant="outline" size="sm" onClick={handlePaste} title="Paste" className="h-10 w-10 p-0">
-                <Clipboard className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePaste}
+                title="Paste"
+                className="h-11 w-11 p-0 rounded-xl premium-depth-btn-secondary shrink-0"
+              >
+                <Clipboard className="h-4 w-4 text-muted-foreground" />
               </Button>
-              <Button variant="outline" size="sm" disabled title="Scan QR" className="h-10 w-10 p-0">
-                <QrCode className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowScanner(true)}
+                title="Scan QR / Solana Pay"
+                className="h-11 w-11 p-0 rounded-xl premium-depth-btn-secondary shrink-0"
+              >
+                <QrCode className="h-4 w-4 text-primary" />
               </Button>
             </div>
+            {paymentNote && (
+              <p className="text-[11px] text-primary bg-primary/10 border border-primary/20 px-2.5 py-1.5 rounded-xl font-medium">
+                {paymentNote}
+              </p>
+            )}
+            {references.length > 0 && (
+              <p className="text-[9px] font-mono text-muted-foreground">
+                Ref: {references[0].slice(0, 8)}…{references[0].slice(-8)} (Solana Pay tracked)
+              </p>
+            )}
             {error && (
-              <p className="text-xs text-destructive flex items-center gap-1">
-                <span className="w-1 h-1 bg-destructive rounded-full"></span>
+              <p className="text-xs text-rose-400 flex items-center gap-1.5 font-medium">
+                <span className="w-1.5 h-1.5 bg-rose-400 rounded-full shrink-0" />
                 {error}
               </p>
             )}
@@ -320,8 +433,8 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
         </div>
 
         {/* Amount */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Amount
           </Label>
           <div className="flex gap-2">
@@ -333,66 +446,89 @@ export const SendModalViewport = ({ open, onOpenChange }: SendModalViewportProps
                 setAmount(e.target.value);
                 setError('');
               }}
-              className={`flex-1 h-10 ${error ? 'border-destructive' : ''}`}
+              className={`flex-1 h-11 rounded-xl premium-depth-inset border-white/10 font-mono text-sm font-bold ${
+                error ? 'border-destructive' : ''
+              }`}
             />
-            <Button variant="outline" onClick={handleMaxClick} className="h-10 px-3">
-              Max
+            <Button
+              variant="outline"
+              onClick={handleMaxClick}
+              className="h-11 px-4 rounded-xl premium-depth-btn-secondary text-xs font-extrabold text-primary"
+            >
+              MAX
             </Button>
           </div>
         </div>
 
         {/* Transaction Details */}
-        <div className="space-y-2">
-          <h4 className="text-xs font-medium text-muted-foreground">
-            Transaction Details
-          </h4>
-          <div className="space-y-1">
-            <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
-              <span className="text-xs text-muted-foreground">
-                Network Fee
+        <div className="p-3 rounded-xl premium-depth-inset space-y-2 text-xs">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Network Gas</span>
+            <span className="font-bold text-emerald-400 flex items-center gap-1">
+              <Zap className="h-3 w-3" /> Sponsored ($0.00)
+            </span>
+          </div>
+          {hasQuickKey && (
+            <label
+              htmlFor="quick-pay-toggle"
+              className="flex justify-between items-center p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg cursor-pointer"
+            >
+              <span className="text-xs text-amber-300 font-semibold flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5" />
+                Quick Pay (no Face ID)
+                {quickPay && amountNum > 0 && (
+                  <span className="text-[10px] text-muted-foreground font-normal">
+                    {quickSignerPreview ? '· within limit' : '· over limit'}
+                  </span>
+                )}
               </span>
-              <span className="text-xs font-medium text-emerald-400">Gasless (Sponsored)</span>
-            </div>
-            <div className="flex justify-between items-center p-2 bg-muted/30 rounded-lg">
-              <span className="text-xs text-muted-foreground">
-                Total Amount
-              </span>
-              <span className="text-xs font-medium">
-                {amountNum > 0 ? `${amountNum} ${selectedToken}` : '-'}
-              </span>
-            </div>
+              <input
+                id="quick-pay-toggle"
+                type="checkbox"
+                checked={quickPay}
+                onChange={(e) => setQuickPay(e.target.checked)}
+                className="h-4 w-4 accent-amber-400"
+              />
+            </label>
+          )}
+          <div className="flex justify-between items-center pt-1 border-t border-white/5">
+            <span className="text-muted-foreground">Total Deducted</span>
+            <span className="font-mono font-extrabold text-white">
+              {amountNum > 0 ? `${amountNum} ${selectedToken}` : '—'}
+            </span>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 pt-3 border-t">
+        <div className="flex gap-2.5 pt-2">
           <Button
             variant="outline"
             onClick={handleClose}
-            className="flex-1 h-10"
+            className="flex-1 h-11 rounded-xl premium-depth-btn-secondary text-xs font-bold"
             disabled={isProcessing}
           >
             Cancel
           </Button>
           <Button
             onClick={handleSend}
-            className="flex-1 h-10"
+            className="flex-1 h-11 rounded-xl premium-depth-btn text-xs font-extrabold uppercase tracking-wider"
             disabled={isProcessing || !!error}
           >
             {isProcessing ? (
               <div className="flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span className="text-sm">Signing...</span>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Signing...</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-sm">Confirm Send</span>
-                <ArrowRight className="h-3 w-3" />
+              <div className="flex items-center gap-1.5">
+                <span>Confirm Send</span>
+                <ArrowRight className="h-3.5 w-3.5" />
               </div>
             )}
           </Button>
         </div>
       </div>
+      <QRScannerModal open={showScanner} onOpenChange={setShowScanner} onQRScanned={handleQRScanned} />
     </ViewportModal>
   );
 };

@@ -1,0 +1,12 @@
+{
+  "cluster": "devnet",
+  "dex": "raydium-cpmm",
+  "programId": "DRaycpLY18LhpbydsBWbVJtxpNv9oXPgjRSfpF2bWpYb",
+  "poolId": "4bk4BXegXmuCbUpYDoARNV2KYvtCLL7stp64GnaKyiEF",
+  "mintA": "RSLc86ULA3mxeapSrAZ9qo3jFUjZNaqrzpXkMGH5BYo",
+  "mintB": "So11111111111111111111111111111111111111112",
+  "createdTx": "494mMwXtE48pkSpwHpjUU8rD1vKxzyocbygkmMxYbbFKbjn6fDMjfZCNgj4RJRPwmvwABkAVxMBHFiVbUy7Tf9AF",
+  "initialPriceUsd": 100.6,
+  "createdAt": "2026-10-26T08:26:22.891Z",
+  "lookupTable": "2PbbNgZKTzGoDCwSFr2cT8NpUXhnEPabjfdTTTdUf3Mp"
+}
